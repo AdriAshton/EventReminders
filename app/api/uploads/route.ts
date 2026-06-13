@@ -1,0 +1,58 @@
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
+import { NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+
+export const runtime = "nodejs";
+
+function verifyToken(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new Error("Unauthorized");
+  }
+  const token = authHeader.split(" ")[1];
+  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+export async function POST(req: Request) {
+  try {
+    const decoded = verifyToken(req);
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "File is required" }, { status: 400 });
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const uploadsDir = path.join(process.cwd(), "public", "uploads", "messages", String(decoded.companyid));
+    await mkdir(uploadsDir, { recursive: true });
+
+    const safeName = sanitizeFileName(file.name || "upload");
+    const fileName = `${Date.now()}-${randomUUID()}-${safeName}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    await writeFile(filePath, buffer);
+
+    return NextResponse.json({
+      url: `/uploads/messages/${decoded.companyid}/${fileName}`,
+      fileName: file.name,
+      mimeType: file.type,
+      size: file.size,
+    });
+  } catch (err: any) {
+    const status = err?.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: err.message || "Upload failed" }, { status });
+  }
+}

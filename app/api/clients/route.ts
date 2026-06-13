@@ -16,11 +16,32 @@ function verifyToken(req: Request) {
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const result = await pool.query(
-      'SELECT * FROM clients WHERE companyid = $1',
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (id) {
+      const result = await pool.query(
+        'SELECT * FROM clients WHERE clientid = $1 AND companyid = $2',
+        [Number(id), decoded.companyid]
+      );
+      if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(result.rows[0]);
+    }
+    // support pagination: ?page=1&pageSize=10
+    const page = Number(url.searchParams.get("page") || "1");
+    const pageSize = Number(url.searchParams.get("pageSize") || "10");
+    const offset = (Math.max(page, 1) - 1) * pageSize;
+
+    const dataResult = await pool.query(
+      'SELECT * FROM clients WHERE companyid = $1 ORDER BY clientid LIMIT $2 OFFSET $3',
+      [decoded.companyid, pageSize, offset]
+    );
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int as total FROM clients WHERE companyid = $1',
       [decoded.companyid]
     );
-    return NextResponse.json(result.rows);
+
+    return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 401 });
   }
@@ -89,7 +110,18 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const { clientid } = await req.json();
+    const body = await req.json();
+    // support single id: { clientid } or bulk: { ids: [1,2,3] }
+    if (Array.isArray(body.ids) && body.ids.length > 0) {
+      await pool.query(
+        'DELETE FROM clients WHERE clientid = ANY($1::int[]) AND companyid = $2',
+        [body.ids, decoded.companyid]
+      );
+      return NextResponse.json({ message: 'Clients deleted successfully', deleted: body.ids.length });
+    }
+
+    const { clientid } = body;
+    if (!clientid) return NextResponse.json({ error: 'clientid is required' }, { status: 400 });
 
     await pool.query(
       'DELETE FROM clients WHERE clientid = $1 AND companyid = $2',

@@ -16,11 +16,33 @@ function verifyToken(req: Request) {
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const result = await pool.query(
-      'SELECT * FROM events WHERE companyid = $1',
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (id) {
+      const result = await pool.query(
+        'SELECT * FROM events WHERE eventid = $1 AND companyid = $2',
+        [Number(id), decoded.companyid]
+      );
+      if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return NextResponse.json(result.rows[0]);
+    }
+
+    // support pagination: ?page=1&pageSize=10
+    const page = Number(url.searchParams.get("page") || "1");
+    const pageSize = Number(url.searchParams.get("pageSize") || "10");
+    const offset = (Math.max(page, 1) - 1) * pageSize;
+
+    const dataResult = await pool.query(
+      'SELECT * FROM events WHERE companyid = $1 ORDER BY eventid LIMIT $2 OFFSET $3',
+      [decoded.companyid, pageSize, offset]
+    );
+
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int as total FROM events WHERE companyid = $1',
       [decoded.companyid]
     );
-    return NextResponse.json(result.rows);
+
+    return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 401 });
   }
@@ -30,18 +52,30 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const { clientid, eventtype, eventdate, notes } = await req.json();
+    const { clientid, eventtypeid, eventdate, notes } = await req.json();
 
-    if (!eventtype || typeof eventtype !== "string" || eventtype.trim() === "") {
-      return NextResponse.json({ error: "Event type is required" }, { status: 400 });
+    if (!eventtypeid || typeof eventtypeid !== 'number') {
+      return NextResponse.json({ error: 'Event type id is required' }, { status: 400 });
+    }
+    // validate event type exists and is global or belongs to this company
+    const typeCheck = await pool.query(
+      'SELECT eventtypeid, companyid FROM eventtypes WHERE eventtypeid = $1',
+      [eventtypeid]
+    );
+    if (typeCheck.rows.length === 0) {
+      return NextResponse.json({ error: 'Invalid event type id' }, { status: 400 });
+    }
+    const et = typeCheck.rows[0];
+    if (et.companyid !== null && et.companyid !== decoded.companyid) {
+      return NextResponse.json({ error: 'Event type does not belong to your company' }, { status: 403 });
     }
     if (!eventdate || isNaN(Date.parse(eventdate))) {
       return NextResponse.json({ error: "Invalid event date" }, { status: 400 });
     }
 
     await pool.query(
-      "INSERT INTO events (clientid, companyid, eventtype, eventdate, notes) VALUES ($1, $2, $3, $4, $5)",
-      [clientid, decoded.companyid, eventtype.trim(), eventdate, notes]
+      "INSERT INTO events (clientid, companyid, eventtypeid, eventdate, notes) VALUES ($1, $2, $3, $4, $5)",
+      [clientid, decoded.companyid, eventtypeid, eventdate, notes]
     );
 
     return NextResponse.json({ message: "Event created successfully" }, { status: 201 });
@@ -54,10 +88,22 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const { eventid, eventtype, eventdate, notes, clientid } = await req.json();
+    const { eventid, eventtypeid, eventdate, notes, clientid } = await req.json();
 
-    if (!eventtype || typeof eventtype !== "string" || eventtype.trim() === "") {
-      return NextResponse.json({ error: "Event type is required" }, { status: 400 });
+    if (!eventtypeid || typeof eventtypeid !== 'number') {
+      return NextResponse.json({ error: 'Event type id is required' }, { status: 400 });
+    }
+    // validate event type exists and is global or belongs to this company
+    const typeCheck = await pool.query(
+      'SELECT eventtypeid, companyid FROM eventtypes WHERE eventtypeid = $1',
+      [eventtypeid]
+    );
+    if (typeCheck.rows.length === 0) {
+      return NextResponse.json({ error: 'Invalid event type id' }, { status: 400 });
+    }
+    const et = typeCheck.rows[0];
+    if (et.companyid !== null && et.companyid !== decoded.companyid) {
+      return NextResponse.json({ error: 'Event type does not belong to your company' }, { status: 403 });
     }
     if (!eventdate || isNaN(Date.parse(eventdate))) {
       return NextResponse.json({ error: "Invalid event date" }, { status: 400 });
@@ -65,9 +111,9 @@ export async function PUT(req: Request) {
 
     await pool.query(
       `UPDATE events 
-       SET eventtype = $1, eventdate = $2, notes = $3, clientid = $4, companyid = $5
+       SET eventtypeid = $1, eventdate = $2, notes = $3, clientid = $4, companyid = $5
        WHERE eventid = $6 AND companyid = $5`,
-      [eventtype.trim(), eventdate, notes, clientid, decoded.companyid, eventid]
+      [eventtypeid, eventdate, notes, clientid, decoded.companyid, eventid]
     );
 
     return NextResponse.json({ message: "Event updated successfully" });

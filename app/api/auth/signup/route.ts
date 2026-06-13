@@ -18,11 +18,20 @@ export async function POST(req: Request) {
     const hash = await bcrypt.hash(password, 10);
 
     // ✅ Insert into users table
+    const defaultRoleResult = await pool.query(
+      `SELECT roleid FROM roles WHERE rolename = 'Staff' LIMIT 1`
+    );
+
+    const defaultRoleId = defaultRoleResult.rows[0]?.roleid;
+    if (!defaultRoleId) {
+      return NextResponse.json({ error: "Default role not found" }, { status: 500 });
+    }
+
     await pool.query(
-  `INSERT INTO users (username, email, passwordhash, companyid, role) 
-   VALUES ($1, $2, $3, $4, $5)`,
-  [username.trim(), email.trim(), hash, companyid, "user"] // default role
-);
+      `INSERT INTO users (username, email, passwordhash, companyid, roleid) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [username.trim(), email.trim(), hash, companyid, defaultRoleId]
+    );
 
     return NextResponse.json(
       { message: "User registered successfully" },
