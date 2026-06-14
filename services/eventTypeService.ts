@@ -1,14 +1,13 @@
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
+
+const getBase = () => {
+  if (typeof window !== 'undefined') return '';
+  return process.env.APP_URL || 'http://localhost:3000';
+};
 
 export async function getEventTypes() {
-  const res = await fetch('/api/event-types', {
+  const res = await authenticatedFetch(`${getBase()}/api/event-types`, {
     method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) return { error: data.error || 'Failed to fetch event types' };
@@ -16,11 +15,10 @@ export async function getEventTypes() {
 }
 
 export async function addEventType(name: string, description?: string) {
-  const res = await fetch('/api/event-types', {
+  const res = await authenticatedFetch(`${getBase()}/api/event-types`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ eventtypename: name, description }),
   });
@@ -30,9 +28,9 @@ export async function addEventType(name: string, description?: string) {
 }
 
 export async function deleteEventType(eventtypeid: number) {
-  const res = await fetch('/api/event-types', {
+  const res = await authenticatedFetch(`${getBase()}/api/event-types`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ eventtypeid }),
   });
   const data = await res.json();
@@ -41,9 +39,9 @@ export async function deleteEventType(eventtypeid: number) {
 }
 
 export async function updateEventType(eventtypeid: number, name: string, description?: string) {
-  const res = await fetch('/api/event-types', {
+  const res = await authenticatedFetch(`${getBase()}/api/event-types`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ eventtypeid, eventtypename: name, description }),
   });
   const data = await res.json();

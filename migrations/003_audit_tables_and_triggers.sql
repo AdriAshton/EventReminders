@@ -97,9 +97,6 @@ CREATE TABLE IF NOT EXISTS MessageAudit (
     ChangeDate TIMESTAMP DEFAULT NOW(),
     OldValue JSONB,
     NewValue JSONB,
-    CONSTRAINT fk_message_audit_message
-        FOREIGN KEY (MessageId) REFERENCES Messages(MessageId)
-        ON DELETE CASCADE,
     CONSTRAINT fk_message_audit_company
         FOREIGN KEY (CompanyId) REFERENCES Companies(CompanyId)
         ON DELETE CASCADE

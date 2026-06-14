@@ -3,6 +3,7 @@
 import { Box, Card, CardContent, Typography, Button, List, ListItem, ListItemText, Divider, Avatar, Chip } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { useEffect, useState } from "react";
+import { clearStoredToken, getTokenPayload } from "@/lib/authClient";
 import { getClients } from "@/services/clientService";
 import { getEvents, getEvent } from "@/services/eventService";
 import { getReminders } from "@/services/reminderServices";
@@ -21,14 +22,13 @@ export default function Dashboard() {
   const [recentReminders, setRecentReminders] = useState<any[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (token) {
-      try {
-        const payloadPart = token.split(".")[1];
-        const decoded = JSON.parse(atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/")));
+      const decoded = getTokenPayload(token);
+      if (decoded) {
         setIsAdministrator(String(decoded.role || "").toLowerCase() === "administrator");
         setUsername(String(decoded.username || ""));
-      } catch {
+      } else {
         setIsAdministrator(false);
         setUsername("");
       }
@@ -79,9 +79,7 @@ export default function Dashboard() {
   }, []);
 
   const handleLogout = () => {
-    // Remove JWT token
-    localStorage.removeItem("token");
-    // Redirect to login page
+    clearStoredToken();
     router.push("/login");
   };
 
@@ -112,6 +110,7 @@ export default function Dashboard() {
             }}
           />
 
+          <Button variant="outlined" onClick={() => router.push('/settings')}>Settings</Button>
           <Button
             variant="outlined"
             color="error"
@@ -142,9 +141,10 @@ export default function Dashboard() {
             <CardContent>
               <Typography variant="h6">Total Events</Typography>
               <Typography variant="h4">{totalEvents}</Typography>
-              <Button href="/events" variant="contained" sx={{ mt: 2 }}>
-                View All
-              </Button>
+                <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                  <Button href="/events" variant="contained">View All</Button>
+                  <Button href="/events/event-types" variant="outlined">Event Types</Button>
+                </Box>
             </CardContent>
           </Card>
         </Grid>

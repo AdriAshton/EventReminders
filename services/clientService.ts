@@ -1,20 +1,14 @@
 // services/clientService.ts
 
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
 
 export async function getClients(page = 1, pageSize = 10) {
   const url = `/api/clients?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
     String(pageSize),
   )}`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -25,11 +19,8 @@ export async function getClients(page = 1, pageSize = 10) {
 }
 
 export async function getClient(clientid: number) {
-  const res = await fetch(`/api/clients?id=${clientid}`, {
+  const res = await authenticatedFetch(`/api/clients?id=${clientid}`, {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -45,11 +36,10 @@ export async function addClient(client: {
   phone: string;
   companyId: number;
 }) {
-  const res = await fetch("/api/clients", {
+  const res = await authenticatedFetch("/api/clients", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(client),
   });
@@ -68,11 +58,10 @@ export async function updateClient(client: {
   phone: string;
   companyId: number;
 }) {
-  const res = await fetch("/api/clients", {
+  const res = await authenticatedFetch("/api/clients", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(client),
   });
@@ -84,11 +73,10 @@ export async function updateClient(client: {
 }
 
 export async function deleteClient(clientid: number) {
-  const res = await fetch("/api/clients", {
+  const res = await authenticatedFetch("/api/clients", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ clientid }),
   });
@@ -100,11 +88,10 @@ export async function deleteClient(clientid: number) {
 }
 
 export async function deleteClients(clientids: number[]) {
-  const res = await fetch("/api/clients", {
+  const res = await authenticatedFetch("/api/clients", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ ids: clientids }),
   });

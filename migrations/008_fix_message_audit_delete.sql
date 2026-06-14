@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE IF EXISTS MessageAudit
+    DROP CONSTRAINT IF EXISTS fk_message,
+    DROP CONSTRAINT IF EXISTS fk_message_audit_message;
+
+COMMIT;

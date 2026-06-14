@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
+function getErrorStatus(err: unknown) {
+  return err instanceof Error && err.message === "Unauthorized" ? 401 : 500;
+}
+
 function verifyToken(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -44,7 +48,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    return NextResponse.json({ error: err.message }, { status: getErrorStatus(err) });
   }
 }
 
@@ -95,7 +99,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    return NextResponse.json({ error: err.message }, { status: getErrorStatus(err) });
   }
 }
 
@@ -158,7 +162,7 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: "Message updated successfully" });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    return NextResponse.json({ error: err.message }, { status: getErrorStatus(err) });
   }
 }
 
@@ -167,13 +171,21 @@ export async function DELETE(req: Request) {
     const decoded = verifyToken(req);
     const { messageid } = await req.json();
 
-    await pool.query(
+    if (!messageid) {
+      return NextResponse.json({ error: "Message id is required" }, { status: 400 });
+    }
+
+    const result = await pool.query(
       "DELETE FROM messages WHERE messageid = $1 AND companyid = $2",
       [messageid, decoded.companyid]
     );
 
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     return NextResponse.json({ message: "Message deleted successfully" });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    return NextResponse.json({ error: err.message }, { status: getErrorStatus(err) });
   }
 }

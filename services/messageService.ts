@@ -1,18 +1,19 @@
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
+
+export type MessageTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+};
 
 export async function getMessages(page = 1, pageSize = 10) {
   const url = `/api/messages?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
     String(pageSize),
   )}`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -22,11 +23,8 @@ export async function getMessages(page = 1, pageSize = 10) {
 }
 
 export async function getMessage(messageid: number) {
-  const res = await fetch(`/api/messages?id=${messageid}`, {
+  const res = await authenticatedFetch(`/api/messages?id=${messageid}`, {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -47,11 +45,10 @@ export async function addMessage(message: {
   status: string;
   sentAt: string | null;
 }) {
-  const res = await fetch("/api/messages", {
+  const res = await authenticatedFetch("/api/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(message),
   });
@@ -75,11 +72,10 @@ export async function updateMessage(message: {
   status: string;
   sentAt: string | null;
 }) {
-  const res = await fetch("/api/messages", {
+  const res = await authenticatedFetch("/api/messages", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(message),
   });
@@ -91,11 +87,10 @@ export async function updateMessage(message: {
 }
 
 export async function deleteMessage(messageid: number) {
-  const res = await fetch("/api/messages", {
+  const res = await authenticatedFetch("/api/messages", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ messageid }),
   });
@@ -110,11 +105,8 @@ export async function uploadMessageImage(file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch("/api/uploads", {
+  const res = await authenticatedFetch("/api/uploads", {
     method: "POST",
-    headers: {
-      ...getAuthHeaders(),
-    },
     body: formData,
   });
 
@@ -124,4 +116,44 @@ export async function uploadMessageImage(file: File) {
   }
 
   return data;
+}
+
+export async function getMessageTemplates() {
+  const res = await authenticatedFetch('/api/settings/message-template', {
+    method: 'GET',
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    return { error: data.error || 'Failed to fetch templates' };
+  }
+
+  return data as {
+    activeTemplateId: string;
+    templates: MessageTemplate[];
+    template: MessageTemplate;
+  };
+}
+
+export async function renderMessageTemplate(templateId: string, reminderId: number) {
+  const res = await authenticatedFetch('/api/templates/render', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ templateId, reminderId }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    return { error: data.error || 'Failed to render template' };
+  }
+
+  return data as {
+    templateId: string;
+    templateName: string;
+    values: Record<string, string>;
+    subject: string;
+    body: string;
+  };
 }

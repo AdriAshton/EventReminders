@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-06-10
+Last updated: 2026-06-14
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -179,7 +179,61 @@ This log is therefore a reconstruction from the current codebase and visible ses
 
 ## Change Log
 
-### 2026-06-10
+ 
+### 2026-06-14
+
+#### Audit logging & schema
+- Fixed `MessageAudit` delete logging which caused `DELETE /api/messages` to fail due to a foreign-key violation. Added migration `migrations/008_fix_message_audit_delete.sql` to drop legacy FK constraints (`fk_message`, `fk_message_audit_message`) and updated the audit table definitions in the main schema files so deletes no longer fail.
+
+#### Session & auth UX
+- Implemented centralized client auth helpers in `lib/authClient.ts` to: read/store JWT, detect expiry, sync token into a cookie for middleware, expose `authenticatedFetch()` and `ensureValidSession()` helpers.
+- Added `app/components/AuthSessionManager.tsx` and wired it into `app/layout.tsx` to proactively validate session state on page load/visibility/focus and redirect expired sessions to `/login?reason=expired`.
+- Updated `app/login/page.tsx` to use `setStoredToken()` and `clearStoredToken()` on login/logout so the middleware and client helpers stay in sync.
+
+#### Services and middleware
+- Refactored many frontend service modules (`services/*`) to use `authenticatedFetch()` instead of manual `localStorage` header plumbing. This centralizes 401 handling and ensures expired tokens cause redirects.
+- Expanded and tightened `proxy.ts` matcher and redirect behavior so protected pages now redirect to `/login?reason=expired` when the middleware detects missing/expired JWT.
+
+#### Project TODOs
+- Marked `Redirect when token expires` as completed in `TODO.md`.
+
+#### Verification
+- Rebuilt the project (`npm run build`) successfully after changes and validated the message delete flow end-to-end against the local DB after applying the migration.
+
+
+#### Two-Factor Authentication (2FA)
+- Implemented TOTP-based 2FA backend endpoints:
+  - `POST /api/auth/2fa/setup` — generates a TOTP secret using `speakeasy`, stores it as `users.settings.twoFactor.pending`, and returns `base32` and `otpauth_url`.
+  - `POST /api/auth/2fa/verify` — verifies a provided token and, on success, moves the pending secret to `users.settings.twoFactor.enabled`.
+- Added a client-side test page at `/settings/2fa`:
+  - UI lets you enter a `userId` (for testing), generate a secret, view `base32` and `otpauth_url`, and submit a code to verify and enable 2FA.
+  - Inputs are plain visible textboxes to simplify testing (QR rendering optional future work).
+- Added a minimal TypeScript declaration shim `types/speakeasy.d.ts` so the build treats `speakeasy` as `any` and type-checking passes.
+
+#### Email & Password Reset
+- Implemented password reset endpoints using SendGrid primary, nodemailer SMTP fallback, and safe dev fallbacks:
+  - `app/api/auth/forgot/route.ts` generates a reset token, stores it in `users.settings.passwordReset`, attempts SendGrid or SMTP delivery, and always returns a generic message to callers (no token returned in responses).
+- Removed developer `test-send.js` helper to avoid accidental spamming of test providers.
+- Investigated and documented Mailtrap behavior:
+  - Observed SMTP error `550 5.7.0 Too many emails per second` — Mailtrap/testing plans rate-limit or disallow external relay.
+  - Recommendation: use SendGrid/Mailgun/SES for external delivery or upgrade Mailtrap plan; for dev keep Mailtrap as a capture-only service.
+
+#### Build & Fixes
+- Fixed parse error in `app/api/auth/2fa/setup/route.ts` by correcting SQL string quoting.
+- Fixed incorrect relative `pool` imports by switching to the project alias `@/lib/db` for the new 2FA routes.
+- Added `types/speakeasy.d.ts` to silence TypeScript implicit-any errors for `speakeasy`.
+
+#### Questions asked & answers provided during work
+- Q: Why did SMTP return `550 Too many emails per second`? — A: Provider (Mailtrap) rate-limited or disallowed relay for that plan.
+- Q: Do I have to pay for SendGrid? — A: No; SendGrid has a free tier suitable for low-volume testing, but production/scale requires paid plans.
+- Q: Which provider is best (SendGrid/SES/Mailgun)? — A: Guidance provided: SendGrid for quick integration, SES for low cost/scale, Mailgun for developer-friendly API.
+- Q: Which provider can I use free now? — A: All three offer low-volume/free options; SendGrid recommended for fastest setup.
+
+#### Next recommended actions
+- Wire 2FA endpoints to use existing JWT auth so the logged-in user doesn't need to pass `userId` in requests (security improvement).
+- Render QR image in the `/settings/2fa` UI for easier authenticator setup.
+- Add encrypted storage for TOTP secrets and recovery codes.
+- For email in production: configure SendGrid (or SES) with verified sender and appropriate env vars; keep Mailtrap for dev-only captures.
 
 #### Dependencies and environment
 - Installed `@types/react` and `@types/react-dom` as dev dependencies.
@@ -397,3 +451,27 @@ Append new entries below this section whenever work is done.
 - The users page currently uses a simple hardcoded role option mapping of `1 = Administrator` and `2 = Staff`.
 - The app now expects `Roles` to exist before inserting or updating users with `RoleId`.
 - The dashboard security card is presentation-only guard logic; direct route protection can still be added separately.
+
+### 2026-06-12
+
+#### EventTypes normalization and UI
+- Added idempotent SQL migration to normalize `EventType` into an `EventTypes` table and update `Events.EventTypeId` references (`migrations/006_eventtypes_migration.sql` and related migrations).
+- Implemented a Node migration runner and `npm run migrate` script to apply migrations safely.
+- Added `services/eventTypeService.ts` with `getEventTypes`, `addEventType`, `updateEventType`, and `deleteEventType` functions.
+- Created API route `app/api/event-types/route.ts` for company-scoped CRUD and updated `app/api/events/route.ts` to validate that `eventtypeid` belongs to the caller's company.
+- Implemented a client-side CRUD page at `app/events/event-types/page.tsx` and added an `Event Types` button to the events card on `app/dashboard/page.tsx` linking to `/events/event-types`.
+
+#### Build & runtime notes
+- Ran `npm run build` after changes; TypeScript and page generation succeed.
+- Observed a non-blocking parse warning during page-data collection: `TypeError: Failed to parse URL from /api/event-types` (ERR_INVALID_URL). Investigation pending; build is otherwise successful.
+
+#### Project tracking
+- Created `TODO.md` at project root with requested feature list (dark mode, 2FA, email/SMS integrations, templates, UI improvements, etc.).
+- Updated the in-repo TODO list via the assistant-managed todo tracker.
+
+#### Next recommended steps
+- Run the migration runner against a development database (set `DATABASE_URL`) to apply new schema and verify data.
+- Investigate and fix the `/api/event-types` parse warning (likely caused by `new URL()` with a relative path in code that runs during SSR).
+- Proceed with one TODO item (please indicate priority).
+
+Log updated by assistant on 2026-06-12.

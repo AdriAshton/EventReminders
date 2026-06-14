@@ -1,17 +1,11 @@
 // services/companyService.ts
 
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
 
 // GET all companies (or scoped by JWT depending on backend)
 export async function getCompanies() {
-  const res = await fetch("/api/companies", {
+  const res = await authenticatedFetch("/api/companies", {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -26,11 +20,10 @@ export async function addCompany(company: {
   contactemail?: string;
   contactphone?: string;
 }) {
-  const res = await fetch("/api/companies", {
+  const res = await authenticatedFetch("/api/companies", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(company),
   });
@@ -48,11 +41,10 @@ export async function updateCompany(company: {
   contactemail?: string;
   contactphone?: string;
 }) {
-  const res = await fetch("/api/companies", {
+  const res = await authenticatedFetch("/api/companies", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(company),
   });
@@ -65,11 +57,10 @@ export async function updateCompany(company: {
 
 // DELETE company
 export async function deleteCompany(companyid: number) {
-  const res = await fetch("/api/companies", {
+  const res = await authenticatedFetch("/api/companies", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ companyid }),
   });

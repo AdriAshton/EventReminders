@@ -1,14 +1,8 @@
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
 
 export async function getUsers() {
-  const res = await fetch("/api/users", {
+  const res = await authenticatedFetch("/api/users", {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
 
   const data = await res.json();
@@ -25,11 +19,10 @@ export async function addUser(user: {
   email: string;
   companyId: number;
 }) {
-  const res = await fetch("/api/users", {
+  const res = await authenticatedFetch("/api/users", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(user),
   });
@@ -49,11 +42,10 @@ export async function updateUser(user: {
   email: string;
   companyId: number;
 }) {
-  const res = await fetch("/api/users", {
+  const res = await authenticatedFetch("/api/users", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(user),
   });
@@ -66,11 +58,10 @@ export async function updateUser(user: {
 }
 
 export async function deleteUser(userid: number) {
-  const res = await fetch("/api/users", {
+  const res = await authenticatedFetch("/api/users", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ userid }),
   });

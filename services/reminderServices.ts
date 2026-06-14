@@ -1,9 +1,6 @@
 // services/reminderService.ts
 
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
 
 // GET all reminders
 export async function getReminders(page = 1, pageSize = 10) {
@@ -11,11 +8,8 @@ export async function getReminders(page = 1, pageSize = 10) {
     String(pageSize),
   )}`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -25,11 +19,8 @@ export async function getReminders(page = 1, pageSize = 10) {
 }
 
 export async function getReminder(reminderid: number) {
-  const res = await fetch(`/api/reminders?id=${reminderid}`, {
+  const res = await authenticatedFetch(`/api/reminders?id=${reminderid}`, {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -46,11 +37,10 @@ export async function addReminder(reminder: {
   remindermethod: string;   // e.g. "Email", "SMS"
   status?: string;          // optional, defaults to "Pending"
 }) {
-  const res = await fetch("/api/reminders", {
+  const res = await authenticatedFetch("/api/reminders", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(reminder),
   });
@@ -70,11 +60,10 @@ export async function updateReminder(reminder: {
   remindermethod: string;
   status: string;
 }) {
-  const res = await fetch("/api/reminders", {
+  const res = await authenticatedFetch("/api/reminders", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(reminder),
   });
@@ -87,11 +76,10 @@ export async function updateReminder(reminder: {
 
 // DELETE reminder
 export async function deleteReminder(reminderid: number) {
-  const res = await fetch("/api/reminders", {
+  const res = await authenticatedFetch("/api/reminders", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ reminderid }),
   });
@@ -103,11 +91,10 @@ export async function deleteReminder(reminderid: number) {
 }
 
 export async function deleteReminders(ids: number[]) {
-  const res = await fetch("/api/reminders", {
+  const res = await authenticatedFetch("/api/reminders", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ ids }),
   });

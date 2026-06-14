@@ -1,20 +1,14 @@
 // services/eventService.ts
 
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import { authenticatedFetch } from "@/lib/authClient";
 
 export async function getEvents(page = 1, pageSize = 10) {
   const url = `/api/events?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
     String(pageSize),
   )}`;
 
-  const res = await fetch(url, {
+  const res = await authenticatedFetch(url, {
     method: 'GET',
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -24,11 +18,8 @@ export async function getEvents(page = 1, pageSize = 10) {
 }
 
 export async function getEvent(eventid: number) {
-  const res = await fetch(`/api/events?id=${eventid}`, {
+  const res = await authenticatedFetch(`/api/events?id=${eventid}`, {
     method: "GET",
-    headers: {
-      ...getAuthHeaders(),
-    },
   });
   const data = await res.json();
   if (!res.ok) {
@@ -44,11 +35,10 @@ export async function addEvent(event: {
   eventdate: string; // ✅ use string for JSON compatibility
   notes: string;
 }) {
-  const res = await fetch("/api/events", {
+  const res = await authenticatedFetch("/api/events", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(event),
   });
@@ -67,11 +57,10 @@ export async function updateEvent(event: {
   notes: string;
   eventid: number;
 }) {
-  const res = await fetch("/api/events", {
+  const res = await authenticatedFetch("/api/events", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify(event),
   });
@@ -83,11 +72,10 @@ export async function updateEvent(event: {
 }
 
 export async function deleteEvent(eventid: number) {
-  const res = await fetch("/api/events", {
+  const res = await authenticatedFetch("/api/events", {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
     },
     body: JSON.stringify({ eventid }),
   });

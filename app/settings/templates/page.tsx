@@ -1,0 +1,339 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  List,
+  ListItemButton,
+  ListItemText,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { useRouter } from "next/navigation";
+import { createTemplateId, renderTemplate } from "@/lib/messageTemplates";
+
+type TemplateState = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+};
+
+const sampleValues = {
+  clientName: "Adrian",
+  companyName: "Birthday Reminders Ltd",
+  senderName: "Customer Care Team",
+  eventDate: "14 June 2026",
+};
+
+const emptyTemplate: TemplateState = {
+  id: "",
+  name: "",
+  subject: "",
+  body: "",
+};
+
+export default function TemplatesPage() {
+  const router = useRouter();
+  const [templates, setTemplates] = useState<TemplateState[]>([]);
+  const [activeTemplateId, setActiveTemplateId] = useState("");
+  const [editor, setEditor] = useState<TemplateState>(emptyTemplate);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  async function loadTemplates() {
+    try {
+      const res = await fetch("/api/settings/message-template");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to load templates");
+        return;
+      }
+
+      setTemplates(data.templates || []);
+      setActiveTemplateId(data.activeTemplateId || "");
+      setEditor(data.template || emptyTemplate);
+    } catch {
+      setError("Failed to load templates");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const preview = useMemo(() => ({
+    subject: renderTemplate(editor.subject || "", sampleValues),
+    body: renderTemplate(editor.body || "", sampleValues),
+  }), [editor]);
+
+  function selectTemplate(template: TemplateState) {
+    setEditor(template);
+    setError(null);
+  }
+
+  function handleCreate() {
+    const newTemplate: TemplateState = {
+      id: createTemplateId(`template-${templates.length + 1}`),
+      name: `Template ${templates.length + 1}`,
+      subject: "Happy Birthday, {{clientName}}!",
+      body: "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}",
+    };
+    setEditor(newTemplate);
+    setError(null);
+  }
+
+  async function handleSave() {
+    if (!editor.name.trim()) {
+      setToast({ open: true, message: "Template name is required", severity: "error" });
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const templateId = editor.id || createTemplateId(editor.name);
+      const res = await fetch("/api/settings/message-template", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...editor,
+          id: templateId,
+          setActive: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to save template");
+        setToast({ open: true, message: data.error || "Failed to save template", severity: "error" });
+        return;
+      }
+
+      setTemplates(data.templates || []);
+      setActiveTemplateId(data.activeTemplateId || templateId);
+      setEditor(data.template || { ...editor, id: templateId });
+      setToast({ open: true, message: "Template saved", severity: "success" });
+    } catch {
+      setError("Failed to save template");
+      setToast({ open: true, message: "Failed to save template", severity: "error" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSetDefault(templateId: string) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/message-template", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ templateId, setActiveOnly: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast({ open: true, message: data.error || "Failed to update default template", severity: "error" });
+        return;
+      }
+      setTemplates(data.templates || []);
+      setActiveTemplateId(data.activeTemplateId || templateId);
+      const current = (data.templates || []).find((item: TemplateState) => item.id === templateId);
+      if (current) {
+        setEditor(current);
+      }
+      setToast({ open: true, message: "Default template updated", severity: "success" });
+    } catch {
+      setToast({ open: true, message: "Failed to update default template", severity: "error" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(templateId: string) {
+    if (!window.confirm("Delete this template?")) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/message-template", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ templateId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast({ open: true, message: data.error || "Failed to delete template", severity: "error" });
+        return;
+      }
+      setTemplates(data.templates || []);
+      setActiveTemplateId(data.activeTemplateId || "");
+      setEditor(data.template || emptyTemplate);
+      setToast({ open: true, message: "Template deleted", severity: "success" });
+    } catch {
+      setToast({ open: true, message: "Failed to delete template", severity: "error" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Stack direction="row" sx={{ mb: 3, justifyContent: "space-between", alignItems: "center" }}>
+        <Box>
+          <Typography variant="h4">Message Templates</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Manage multiple birthday templates and choose the global default.
+          </Typography>
+        </Box>
+        <Button variant="outlined" onClick={() => router.push("/settings")}>Back to Settings</Button>
+      </Stack>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
+        <Card sx={{ width: { xs: "100%", md: 320 } }}>
+          <CardContent>
+            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+              <Typography variant="h6">Templates</Typography>
+              <Button variant="outlined" size="small" onClick={handleCreate} disabled={loading || saving}>
+                New
+              </Button>
+            </Stack>
+
+            <List dense>
+              {templates.map((template) => (
+                <ListItemButton
+                  key={template.id}
+                  selected={editor.id === template.id}
+                  onClick={() => selectTemplate(template)}
+                >
+                  <ListItemText
+                    primary={template.name}
+                    secondary={template.id === activeTemplateId ? "Default template" : template.id}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ flex: 1 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>Editor</Typography>
+
+            <Stack spacing={2}>
+              <TextField
+                label="Template name"
+                value={editor.name}
+                onChange={(e) => setEditor((current) => ({ ...current, name: e.target.value }))}
+                disabled={loading || saving}
+                fullWidth
+              />
+              <TextField
+                label="Email subject"
+                value={editor.subject}
+                onChange={(e) => setEditor((current) => ({ ...current, subject: e.target.value }))}
+                disabled={loading || saving}
+                fullWidth
+              />
+              <TextField
+                label="Message body"
+                value={editor.body}
+                onChange={(e) => setEditor((current) => ({ ...current, body: e.target.value }))}
+                disabled={loading || saving}
+                fullWidth
+                multiline
+                minRows={10}
+              />
+
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+                <Chip label="{{clientName}}" size="small" />
+                <Chip label="{{companyName}}" size="small" />
+                <Chip label="{{senderName}}" size="small" />
+                <Chip label="{{eventDate}}" size="small" />
+              </Stack>
+
+              <Stack direction="row" spacing={2}>
+                <Button variant="contained" onClick={handleSave} disabled={loading || saving}>
+                  {saving ? "Saving..." : "Save Template"}
+                </Button>
+                {editor.id && (
+                  <>
+                    <Button variant="outlined" onClick={() => handleSetDefault(editor.id)} disabled={loading || saving || editor.id === activeTemplateId}>
+                      Set As Default
+                    </Button>
+                    <Button color="error" onClick={() => handleDelete(editor.id)} disabled={loading || saving}>
+                      Delete
+                    </Button>
+                  </>
+                )}
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ flex: 1 }}>
+          <CardContent>
+            <Typography variant="h6">Preview</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Example values are substituted live so you can see the final birthday message.
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+
+            <Typography variant="subtitle2" color="text.secondary">Subject</Typography>
+            <Typography variant="h6" sx={{ mb: 2 }}>{preview.subject}</Typography>
+
+            <Typography variant="subtitle2" color="text.secondary">Body</Typography>
+            <Box
+              sx={{
+                whiteSpace: "pre-wrap",
+                p: 2,
+                borderRadius: 2,
+                bgcolor: "rgba(0,0,0,0.04)",
+                border: "1px solid rgba(0,0,0,0.08)",
+              }}
+            >
+              {preview.body}
+            </Box>
+          </CardContent>
+        </Card>
+      </Stack>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3000}
+        onClose={() => setToast((current) => ({ ...current, open: false }))}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((current) => ({ ...current, open: false }))}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}

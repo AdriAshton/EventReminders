@@ -5,20 +5,26 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:watch": "chokidar \"app/** lib/** pages/**\" -c \"npm run build\" --initial",
     "start": "next start",
-    "lint": "eslint"
-    ,"migrate": "node ./scripts/run_migrations.js"
+    "lint": "eslint",
+    "migrate": "node ./scripts/run_migrations.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^9.1.0",
+    "@sendgrid/mail": "^8.0.0",
+    "axios": "^1.5.0",
     "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.7",
+    "nodemailer": "^6.9.4",
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "speakeasy": "^2.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -32,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "chokidar-cli": "^3.0.0",
     "typescript": "^5"
   }
 }

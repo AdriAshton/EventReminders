@@ -1,0 +1,14 @@
+{
+  "twoFactorGlobal": false,
+  "messageTemplates": {
+    "activeTemplateId": "birthday-default",
+    "templates": [
+      {
+        "id": "birthday-default",
+        "name": "Default Birthday Template",
+        "subject": "Happy Birthday, {{clientName}}!",
+        "body": "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}"
+      }
+    ]
+  }
+}

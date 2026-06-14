@@ -26,9 +26,12 @@ import { useRouter } from "next/navigation";
 import {
   addMessage,
   deleteMessage,
+  getMessageTemplates,
   getMessages,
+  renderMessageTemplate,
   uploadMessageImage,
   updateMessage,
+  type MessageTemplate,
 } from "@/services/messageService";
 
 export default function MessagesPage() {
@@ -36,6 +39,10 @@ export default function MessagesPage() {
   const newPictureInputRef = useRef<HTMLInputElement | null>(null);
   const editPictureInputRef = useRef<HTMLInputElement | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templatePreview, setTemplatePreview] = useState<{ subject: string; body: string; values: Record<string, string> } | null>(null);
+  const [renderingTemplate, setRenderingTemplate] = useState(false);
   const [pkFilter, setPkFilter] = useState<number | string>("");
   const [fkFilter, setFkFilter] = useState<number | string>("");
   const [page, setPage] = useState(1);
@@ -66,6 +73,10 @@ export default function MessagesPage() {
     loadMessages(page);
   }, [page]);
 
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
   async function loadMessages(pageParam: number = page) {
     const data = await getMessages(pageParam, pageSize);
     if (data.error) {
@@ -75,6 +86,45 @@ export default function MessagesPage() {
       setTotal(data.total || 0);
       setError(null);
     }
+  }
+
+  async function loadTemplates() {
+    const data = await getMessageTemplates();
+    if ("error" in data) {
+      setError(data.error);
+      return;
+    }
+
+    setTemplates(data.templates || []);
+    setSelectedTemplateId(data.activeTemplateId || data.template?.id || "");
+  }
+
+  async function handlePreviewTemplate() {
+    if (!newMessage.reminderId) {
+      setToast({ open: true, message: "Enter a reminder id first", severity: "error" });
+      return;
+    }
+
+    setRenderingTemplate(true);
+    const result = await renderMessageTemplate(selectedTemplateId, newMessage.reminderId);
+    setRenderingTemplate(false);
+
+    if ("error" in result) {
+      setToast({ open: true, message: result.error, severity: "error" });
+      return;
+    }
+
+    setTemplatePreview({
+      subject: result.subject,
+      body: result.body,
+      values: result.values,
+    });
+    setNewMessage((currentMessage) => ({
+      ...currentMessage,
+      subject: result.subject,
+      messageBody: result.body,
+    }));
+    setToast({ open: true, message: "Template preview applied", severity: "success" });
   }
 
   async function handleAdd() {
@@ -364,9 +414,34 @@ export default function MessagesPage() {
           label="Reminder ID"
           type="number"
           value={newMessage.reminderId}
-          onChange={(e) => setNewMessage({ ...newMessage, reminderId: Number(e.target.value) })}
+          onChange={(e) => {
+            setTemplatePreview(null);
+            setNewMessage({ ...newMessage, reminderId: Number(e.target.value) });
+          }}
           {...textFieldProps}
         />
+        <FormControl sx={{ minWidth: 220 }}>
+          <InputLabel id="new-message-template-label">Template</InputLabel>
+          <Select
+            labelId="new-message-template-label"
+            value={selectedTemplateId}
+            label="Template"
+            onChange={(e) => {
+              setTemplatePreview(null);
+              setSelectedTemplateId(String(e.target.value));
+            }}
+            sx={{ color: "#fff" }}
+          >
+            {templates.map((template) => (
+              <MenuItem key={template.id} value={template.id}>
+                {template.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button variant="outlined" onClick={handlePreviewTemplate} disabled={renderingTemplate || !selectedTemplateId}>
+          {renderingTemplate ? "Previewing..." : "Preview With Client Data"}
+        </Button>
         <FormControl sx={{ minWidth: 160 }}>
           <InputLabel id="new-message-channel-label">Channel</InputLabel>
           <Select
@@ -459,6 +534,24 @@ export default function MessagesPage() {
           Add
         </Button>
       </Box>
+
+      {templatePreview && (
+        <Paper sx={{ p: 2, mb: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Template Preview
+          </Typography>
+          <Typography variant="subtitle2">Subject</Typography>
+          <Typography sx={{ mb: 2 }}>{templatePreview.subject}</Typography>
+          <Typography variant="subtitle2">Body</Typography>
+          <Box sx={{ whiteSpace: "pre-wrap", mb: 2 }}>{templatePreview.body}</Box>
+          <Typography variant="subtitle2">Resolved Values</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {Object.entries(templatePreview.values)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(" • ")}
+          </Typography>
+        </Paper>
+      )}
 
       {editingMessage && (
         <Box sx={{ mt: 3 }}>

@@ -2,6 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 
+const protectedPagePrefixes = [
+  "/dashboard",
+  "/clients",
+  "/companies",
+  "/events",
+  "/messages",
+  "/reminders",
+  "/settings",
+  "/users",
+];
+
+const protectedApiPrefixes = [
+  "/api/clients",
+  "/api/companies",
+  "/api/event-types",
+  "/api/events",
+  "/api/messages",
+  "/api/reminders",
+  "/api/templates/render",
+  "/api/uploads",
+  "/api/users",
+  "/api/users/settings",
+];
+
 function getTokenPayload(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const cookieToken = req.cookies.get("auth")?.value;
@@ -24,25 +48,18 @@ function getTokenPayload(req: NextRequest) {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/companies") || pathname.startsWith("/users")) {
+  if (protectedPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
     const payload = getTokenPayload(req);
     if (!payload) {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login?reason=expired", req.url));
     }
 
-    if (String(payload.role || "").toLowerCase() !== "administrator") {
+    if ((pathname.startsWith("/companies") || pathname.startsWith("/users")) && String(payload.role || "").toLowerCase() !== "administrator") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }
 
-  if (
-    pathname.startsWith("/api/clients") ||
-    pathname.startsWith("/api/events") ||
-    pathname.startsWith("/api/reminders") ||
-    pathname.startsWith("/api/messages") ||
-    pathname.startsWith("/api/users") ||
-    pathname.startsWith("/api/companies")
-  ) {
+  if (protectedApiPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     const payload = getTokenPayload(req);
     if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,12 +74,22 @@ export function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     "/api/clients/:path*",
-    "/api/events/:path*",
-    "/api/reminders/:path*",
-    "/api/messages/:path*",
-    "/api/users/:path*",
     "/api/companies/:path*",
+    "/api/event-types/:path*",
+    "/api/events/:path*",
+    "/api/messages/:path*",
+    "/api/reminders/:path*",
+    "/api/templates/render/:path*",
+    "/api/uploads/:path*",
+    "/api/users/:path*",
+    "/api/users/settings/:path*",
+    "/dashboard/:path*",
+    "/clients/:path*",
     "/companies/:path*",
+    "/events/:path*",
+    "/messages/:path*",
+    "/reminders/:path*",
+    "/settings/:path*",
     "/users/:path*",
   ],
 };
