@@ -1,6 +1,6 @@
 // app/dashboard/page.tsx
 "use client";
-import { Box, Card, CardContent, Typography, Button, List, ListItem, ListItemText, Divider, Avatar, Chip } from "@mui/material";
+import { Box, Card, CardContent, Typography, Button, List, ListItem, ListItemText, Divider, Avatar, Chip, Stack, useTheme } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { useEffect, useState } from "react";
 import { clearStoredToken, getTokenPayload } from "@/lib/authClient";
@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const router = useRouter();
+  const theme = useTheme();
   const [totalClients, setTotalClients] = useState<number>(0);
   const [totalEvents, setTotalEvents] = useState<number>(0);
   const [activeReminders, setActiveReminders] = useState<number>(0);
@@ -20,6 +21,16 @@ export default function Dashboard() {
 
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [recentReminders, setRecentReminders] = useState<any[]>([]);
+
+  function formatDate(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  }
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -84,20 +95,35 @@ export default function Dashboard() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>
-          Company Dashboard
-        </Typography>
+    <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
+      <Box
+        sx={{
+          mb: 3,
+          p: { xs: 2.5, md: 3.5 },
+          borderRadius: 4,
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light || theme.palette.primary.main} 50%, ${theme.palette.secondary.main} 100%)`,
+          color: '#fff',
+          boxShadow: '0 24px 60px rgba(31,41,55,0.18)',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ mb: 0.5, color: '#fff' }}>
+              Company Dashboard
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.82)' }}>
+              Manage clients, events, reminders, and messaging from one place.
+            </Typography>
+          </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Chip
             avatar={
               <Avatar sx={{ bgcolor: "#1976d2", color: "#fff", fontWeight: 700 }}>
                 {username ? username.charAt(0).toUpperCase() : "U"}
               </Avatar>
             }
-            label={username ? `Logged in as ${username}` : "Logged in"}
+            label={username ? `LOGGED IN AS ${username.toUpperCase()}` : "LOGGED IN"}
             variant="filled"
             sx={{
               fontWeight: 700,
@@ -110,14 +136,38 @@ export default function Dashboard() {
             }}
           />
 
-          <Button variant="outlined" onClick={() => router.push('/settings')}>Settings</Button>
           <Button
-            variant="outlined"
-            color="error"
+            variant="contained"
+            onClick={() => router.push('/settings')}
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.95)',
+              color: theme.palette.primary.main,
+              fontWeight: 800,
+              boxShadow: '0 10px 24px rgba(15,23,42,0.22)',
+              '&:hover': {
+                bgcolor: '#fff',
+                color: theme.palette.primary.dark || theme.palette.primary.main,
+              },
+            }}
+          >
+            Settings
+          </Button>
+          <Button
+            variant="contained"
             onClick={handleLogout}
+            sx={{
+              bgcolor: '#111827',
+              color: '#fff',
+              fontWeight: 800,
+              boxShadow: '0 10px 24px rgba(15,23,42,0.28)',
+              '&:hover': {
+                bgcolor: '#000',
+              },
+            }}
           >
             Logout
           </Button>
+          </Box>
         </Box>
       </Box>
 
@@ -195,7 +245,7 @@ export default function Dashboard() {
         )}
       </Grid>
 
-      <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
+      <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
         <Card>
           <CardContent>
             <Typography variant="h6">Upcoming Events</Typography>
@@ -204,7 +254,7 @@ export default function Dashboard() {
               {upcomingEvents.length ? (
                 upcomingEvents.map((ev: any) => (
                   <ListItem key={ev.eventid}>
-                    <ListItemText primary={`${ev.clientid ? `Client ${ev.clientid}` : 'Client'} – ${ev.eventtype} – ${ev.eventdate}`} />
+                    <ListItemText primary={`${ev.clientid ? `Client ${ev.clientid}` : 'Client'} – ${ev.eventtype} – ${formatDate(ev.eventdate)}`} secondary={ev.clientName} />
                   </ListItem>
                 ))
               ) : (
@@ -224,7 +274,7 @@ export default function Dashboard() {
               {recentReminders.length ? (
                 recentReminders.map((r: any) => (
                   <ListItem key={r.reminderid}>
-                    <ListItemText primary={r.status === 'Sent' ? `Email sent to Client ${r.eventid}` : `SMS scheduled for Client ${r.eventid}`} />
+                    <ListItemText primary={r.status === 'Sent' ? `Email sent to Client ${r.eventid}` : `Reminder scheduled for Client ${r.eventid}`} secondary={r.clientName} />
                   </ListItem>
                 ))
               ) : (

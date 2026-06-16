@@ -79,8 +79,13 @@ export default function TwoFactorSettings() {
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>Enter code from authenticator</label>
-        <input value={token} onChange={(e) => setToken(e.target.value)} style={{ padding: 10, width: 220, background: '#111', color: '#fff', border: '1px solid #444', borderRadius: 6 }} />
+        <label style={{ display: 'block', marginBottom: 8 }}>Verification code</label>
+        <input
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Enter the 6-digit code"
+          style={{ padding: 10, width: 220, background: '#111', color: '#fff', border: '1px solid #444', borderRadius: 6 }}
+        />
         <div style={{ marginTop: 8 }}>
           <button onClick={handleVerify} style={{ padding: '10px 14px', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Verify & Enable</button>
         </div>

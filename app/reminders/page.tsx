@@ -57,6 +57,16 @@ export default function RemindersPage() {
   });
 
   const [editingReminder, setEditingReminder] = useState<any | null>(null);
+
+  function formatDate(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  }
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
@@ -313,7 +323,7 @@ export default function RemindersPage() {
                 </TableCell>
                 <TableCell>{reminder.eventid}</TableCell>
                 <TableCell>{reminder.companyid}</TableCell>
-                <TableCell>{reminder.reminderdatetime}</TableCell>
+                <TableCell>{formatDate(reminder.reminderdatetime)}</TableCell>
                 <TableCell>{reminder.remindermethod}</TableCell>
                 <TableCell>{reminder.status}</TableCell>
 

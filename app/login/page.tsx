@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  Link,
   TextField,
   Typography,
 } from "@mui/material";
@@ -115,7 +116,8 @@ export default function LoginPage() {
             {preAuthUserId && (
               <Box sx={{ mt: 2 }}>
                 <TextField
-                  label="2FA code"
+                  label="Verification code"
+                  placeholder="Enter the 6-digit code"
                   name="totp"
                   value={totp}
                   onChange={(e) => setTotp(e.target.value)}
@@ -124,16 +126,30 @@ export default function LoginPage() {
                   {...({ inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } } as any)}
                 />
                 <Button variant="outlined" fullWidth onClick={handleVerifyTotp} sx={{ mt: 1 }}>
-                  Verify 2FA Code
+                  Continue
                 </Button>
               </Box>
             )}
           </form>
           <Typography variant="body2" sx={{ mt: 2 }}>
-            Don’t have an account? <a href="/signup">Sign up</a>
+            Account access is managed by your administrator.
           </Typography>
           <Typography variant="body2" sx={{ mt: 1 }}>
-            <a href="/forgot">Forgot password?</a>
+            <Link
+              href="/forgot"
+              sx={{
+                color: "primary.main",
+                fontWeight: 600,
+                textDecoration: "none",
+                transition: "color 0.2s ease, text-decoration-color 0.2s ease",
+                "&:hover": {
+                  color: "primary.dark",
+                  textDecoration: "underline",
+                },
+              }}
+            >
+              Forgot password?
+            </Link>
           </Typography>
         </CardContent>
       </Card>

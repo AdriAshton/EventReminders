@@ -8,7 +8,8 @@
     "build:watch": "chokidar \"app/** lib/** pages/**\" -c \"npm run build\" --initial",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "node ./scripts/run_migrations.js"
+    "migrate": "node ./scripts/run_migrations.js",
+    "process-reminders": "node ./scripts/process_recurring_reminders.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

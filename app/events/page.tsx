@@ -20,6 +20,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Card,
+  CardContent,
+  Stack,
+  Divider,
 } from "@mui/material";
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useRouter } from "next/navigation";
@@ -46,6 +50,16 @@ export default function EventsPage() {
     companyid: 1,
   });
   const [editingEvent, setEditingEvent] = useState<any | null>(null);
+
+  function formatDate(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  }
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
@@ -138,9 +152,28 @@ export default function EventsPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+    <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+            <Box>
+              <Typography variant="h4" sx={{ mb: 0.5 }}>Events</Typography>
+              <Typography variant="body2" color="text.secondary">Track event dates, types, and notes with a cleaner workflow.</Typography>
+            </Box>
+            <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label htmlFor="events-import-input">
+                <Button component="span" variant="contained">Import</Button>
+              </label>
+            </Box>
+          </Box>
 
         <input
           id="events-import-input"
@@ -160,14 +193,8 @@ export default function EventsPage() {
             }
           }}
         />
-        <label htmlFor="events-import-input">
-          <Button component="span" variant="contained">Import</Button>
-        </label>
-      </Box>
-
-      <Typography variant="h4" gutterBottom>
-        Events
-      </Typography>
+        </CardContent>
+      </Card>
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
@@ -175,7 +202,9 @@ export default function EventsPage() {
         </Typography>
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel id="rows-per-page-label">Rows</InputLabel>
           <Select
@@ -230,8 +259,12 @@ export default function EventsPage() {
           showLastButton
         />
       </Box>
+        </CardContent>
+      </Card>
 
-      <TableContainer component={Paper} sx={{ mb: 3 }}>
+      <Divider sx={{ my: 2 }} />
+
+      <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -261,7 +294,7 @@ export default function EventsPage() {
                 }}
               >
                 <TableCell>{eventItem.eventtype}</TableCell>
-                <TableCell>{eventItem.eventdate}</TableCell>
+                <TableCell>{formatDate(eventItem.eventdate)}</TableCell>
                 <TableCell>{eventItem.notes}</TableCell>
 
                 <TableCell align="right">

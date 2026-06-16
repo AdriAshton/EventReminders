@@ -2,6 +2,37 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
 
+function isBirthdayEventType(eventtypeid: number, eventtypename?: string | null) {
+  return String(eventtypename || '').toLowerCase().includes('birthday') || Number(eventtypeid) === 1;
+}
+
+function buildNextRunAt(eventdate: string) {
+  const date = new Date(eventdate);
+  return date.toISOString();
+}
+
+async function createBirthdayReminder(companyid: number, eventid: number, eventdate: string) {
+  await pool.query(
+    `INSERT INTO reminders (
+      eventid, companyid, reminderdatetime, remindermethod, status, timingtype, timingvalue, timingunit, sendtime, isactive,
+      isrecurring, recurrenceType, recurrenceInterval, nextRunAt
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 'yearly', 1, $11)`,
+    [
+      eventid,
+      companyid,
+      eventdate,
+      'email',
+      'Pending',
+      'OnDay',
+      0,
+      'Days',
+      '09:00:00',
+      true,
+      buildNextRunAt(eventdate),
+    ]
+  );
+}
+
 // Helper: verify token
 function verifyToken(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -73,10 +104,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid event date" }, { status: 400 });
     }
 
-    await pool.query(
-      "INSERT INTO events (clientid, companyid, eventtypeid, eventdate, notes) VALUES ($1, $2, $3, $4, $5)",
+    const inserted = await pool.query(
+      "INSERT INTO events (clientid, companyid, eventtypeid, eventdate, notes) VALUES ($1, $2, $3, $4, $5) RETURNING eventid",
       [clientid, decoded.companyid, eventtypeid, eventdate, notes]
     );
+
+    if (isBirthdayEventType(eventtypeid, et.eventtypename)) {
+      await createBirthdayReminder(decoded.companyid, inserted.rows[0].eventid, eventdate);
+    }
 
     return NextResponse.json({ message: "Event created successfully" }, { status: 201 });
   } catch (err: any) {
@@ -115,6 +150,24 @@ export async function PUT(req: Request) {
        WHERE eventid = $6 AND companyid = $5`,
       [eventtypeid, eventdate, notes, clientid, decoded.companyid, eventid]
     );
+
+    if (isBirthdayEventType(eventtypeid, et.eventtypename)) {
+      const reminderResult = await pool.query(
+        'SELECT reminderid FROM reminders WHERE eventid = $1 AND companyid = $2 ORDER BY reminderid LIMIT 1',
+        [eventid, decoded.companyid]
+      );
+
+      if (reminderResult.rows[0]) {
+        await pool.query(
+          `UPDATE reminders
+           SET reminderdatetime = $1, isrecurring = TRUE, recurrenceType = 'yearly', recurrenceInterval = 1, nextRunAt = $2, remindermethod = 'email'
+           WHERE reminderid = $3 AND companyid = $4`,
+          [eventdate, buildNextRunAt(eventdate), reminderResult.rows[0].reminderid, decoded.companyid]
+        );
+      } else {
+        await createBirthdayReminder(decoded.companyid, eventid, eventdate);
+      }
+    }
 
     return NextResponse.json({ message: "Event updated successfully" });
   } catch (err: any) {

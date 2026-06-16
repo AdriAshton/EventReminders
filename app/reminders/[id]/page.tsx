@@ -13,6 +13,16 @@ export default function ReminderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function formatDate(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  }
+
   useEffect(() => {
     if (!id) {
       setError("Missing id");
@@ -55,7 +65,7 @@ export default function ReminderDetailPage() {
       <Paper sx={{ p: 2, maxWidth: 600 }}>
         <Typography><strong>Event ID:</strong> {reminder.eventid}</Typography>
         <Typography><strong>Company ID:</strong> {reminder.companyid}</Typography>
-        <Typography><strong>Time:</strong> {reminder.reminderdatetime}</Typography>
+        <Typography><strong>Time:</strong> {formatDate(reminder.reminderdatetime)}</Typography>
         <Typography><strong>Method:</strong> {reminder.remindermethod}</Typography>
         <Typography><strong>Status:</strong> {reminder.status}</Typography>
         <Typography><strong>Reminder ID:</strong> {reminder.reminderid}</Typography>

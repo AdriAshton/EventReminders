@@ -1,41 +1,9 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import crypto from "crypto";
-import sendgrid from "@sendgrid/mail";
-import nodemailer from "nodemailer";
+import { sendEmail } from "@/lib/email";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
-
-async function sendBySendGrid(to: string, link: string) {
-  sendgrid.setApiKey(process.env.SENDGRID_API_KEY || "");
-  const msg = {
-    to,
-    from: process.env.EMAIL_FROM || "no-reply@example.com",
-    subject: "Password reset instructions",
-    text: `Reset your password: ${link}`,
-    html: `<p>Reset your password: <a href="${link}">${link}</a></p>`,
-  };
-  return sendgrid.send(msg);
-}
-
-async function sendBySMTP(to: string, link: string) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE) === "true",
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      : undefined,
-  });
-
-  return transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'no-reply@example.com',
-    to,
-    subject: 'Password reset instructions',
-    text: `Reset your password: ${link}`,
-    html: `<p>Reset your password: <a href="${link}">${link}</a></p>`,
-  });
-}
 
 export async function POST(req: Request) {
   try {
@@ -56,31 +24,24 @@ export async function POST(req: Request) {
 
     const link = `${APP_URL}/reset/${token}`;
 
-    // Try SendGrid
-    if (process.env.SENDGRID_API_KEY) {
-      try {
-        await sendBySendGrid(user.email, link);
-        return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
-      } catch (e) {
-        console.error('SendGrid error', e);
-      }
-    }
-
-    // Try SMTP
-    if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-      try {
-        await sendBySMTP(user.email, link);
-        return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
-      } catch (e) {
-        console.error('SMTP error', e);
-      }
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Password reset instructions',
+        text: `Reset your password: ${link}`,
+        html: `<p>Reset your password: <a href="${link}">${link}</a></p>`,
+      });
+      return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
+    } catch (e) {
+      console.error('Email send error', e);
     }
 
     // Fallback: log link and return generic message. Never include the link in responses.
     console.log(`Password reset link for ${user.email}: ${link}`);
     return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

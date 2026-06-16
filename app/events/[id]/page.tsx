@@ -13,6 +13,16 @@ export default function EventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function formatDate(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}-${day}-${year}`;
+  }
+
   useEffect(() => {
     if (!id) {
       setError("Missing id");
@@ -54,8 +64,7 @@ export default function EventDetailPage() {
       <Typography variant="h4" gutterBottom>Event Details</Typography>
       <Paper sx={{ p: 2, maxWidth: 600 }}>
         <Typography><strong>Type:</strong> {event.eventtype}</Typography>
-        <Typography><strong>Date:</strong> {event.eventdate}</Typography>
-        <Typography><strong>Notes:</strong> {event.notes}</Typography>
+        <Typography><strong>Date:</strong> {formatDate(event.eventdate)}</Typography>
         <Typography><strong>Event ID:</strong> {event.eventid}</Typography>
       </Paper>
     </Box>

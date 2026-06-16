@@ -13,6 +13,21 @@ export default function ClientDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function maskEmail(email: string | null | undefined) {
+    if (!email) return "";
+    const [localPart = "", domainPart = ""] = String(email).split("@");
+    if (!domainPart) return "***";
+    const visibleLocal = localPart.slice(0, 2);
+    return `${visibleLocal}${localPart.length > 2 ? "***" : ""}@${domainPart}`;
+  }
+
+  function maskPhone(phone: string | null | undefined) {
+    if (!phone) return "";
+    const digits = String(phone).replace(/\D/g, "");
+    if (digits.length <= 4) return "****";
+    return `${"*".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
+  }
+
   useEffect(() => {
     if (!id) {
       setError("Missing id");
@@ -80,8 +95,8 @@ export default function ClientDetailPage() {
       <Paper sx={{ p: 2, maxWidth: 600 }}>
         <Typography><strong>First Name:</strong> {client.firstname}</Typography>
         <Typography><strong>Last Name:</strong> {client.lastname}</Typography>
-        <Typography><strong>Email:</strong> {client.email}</Typography>
-        <Typography><strong>Phone:</strong> {client.phone}</Typography>
+        <Typography><strong>Email:</strong> {maskEmail(client.email)}</Typography>
+        <Typography><strong>Phone:</strong> {maskPhone(client.phone)}</Typography>
         <Typography><strong>Client ID:</strong> {client.clientid}</Typography>
         {/* Edit button removed as requested */}
       </Paper>

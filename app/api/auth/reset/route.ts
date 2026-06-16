@@ -4,8 +4,9 @@ import bcrypt from "bcrypt";
 
 export async function POST(req: Request) {
   try {
-    const { token, password } = await req.json();
-    if (!token || !password) return NextResponse.json({ error: "Token and password are required" }, { status: 400 });
+    const { token, password, confirmPassword } = await req.json();
+    if (!token || !password || !confirmPassword) return NextResponse.json({ error: "Token, password, and confirm password are required" }, { status: 400 });
+    if (password !== confirmPassword) return NextResponse.json({ error: "Passwords do not match" }, { status: 400 });
 
     const res = await pool.query(`SELECT userid, settings FROM users WHERE settings->'passwordReset'->>'token' = $1 LIMIT 1`, [token]);
     const user = res.rows[0];

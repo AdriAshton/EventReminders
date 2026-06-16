@@ -1,5 +1,8 @@
 {
-  "twoFactorGlobal": false,
+  "twoFactorGlobal": true,
+  "email": {
+    "provider": "gmail"
+  },
   "messageTemplates": {
     "activeTemplateId": "birthday-default",
     "templates": [

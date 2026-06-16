@@ -8,12 +8,18 @@ export default function ResetPage() {
   const params = useParams();
   const token = params?.token;
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [msg, setMsg] = useState("");
   const router = useRouter();
 
   const submit = async () => {
+    if (password !== confirmPassword) {
+      setMsg("Passwords do not match");
+      return;
+    }
+
     try {
-      const res = await axios.post('/api/auth/reset', { token, password });
+      const res = await axios.post('/api/auth/reset', { token, password, confirmPassword });
       setMsg(res.data.message || 'Password updated');
       setTimeout(() => router.push('/login'), 1500);
     } catch (e: any) {
@@ -42,7 +48,21 @@ export default function ResetPage() {
         fullWidth
       />
 
-      <Button variant="contained" sx={{ mt: 2 }} onClick={submit} disabled={!token}>Set password</Button>
+      <TextField
+        label="Confirm password"
+        type="password"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
+        sx={{
+          mt: 2,
+          '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.85)' },
+          '& .MuiInputBase-input': { color: 'rgba(255,255,255,0.95)' },
+          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 1 },
+        }}
+        fullWidth
+      />
+
+      <Button variant="contained" sx={{ mt: 2 }} onClick={submit} disabled={!token || !password || !confirmPassword}>Set password</Button>
 
       {token && process.env.NODE_ENV !== 'production' && (
         <Typography variant="body2" sx={{ mt: 2 }}>Token (dev): {token}</Typography>

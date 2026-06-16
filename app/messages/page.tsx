@@ -5,6 +5,10 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  Stack,
+  Divider,
   MenuItem,
   Pagination,
   Paper,
@@ -263,14 +267,18 @@ export default function MessagesPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 2 }}>
-        Back
-      </Button>
-
-      <Typography variant="h4" gutterBottom>
-        Messages
-      </Typography>
+    <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
+            <Box>
+              <Typography variant="h4" sx={{ mb: 0.5 }}>Messages</Typography>
+              <Typography variant="body2" color="text.secondary">Manage message drafts, channels, attachments, and template previews.</Typography>
+            </Box>
+            <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+          </Box>
+        </CardContent>
+      </Card>
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
@@ -278,7 +286,9 @@ export default function MessagesPage() {
         </Typography>
       )}
 
-      <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+      <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: 'wrap', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel id="messages-rows-per-page-label">Rows</InputLabel>
           <Select
@@ -333,8 +343,12 @@ export default function MessagesPage() {
           showLastButton
         />
       </Box>
+        </CardContent>
+      </Card>
 
-      <TableContainer component={Paper} sx={{ mb: 3 }}>
+      <Divider sx={{ my: 2 }} />
+
+      <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
         <Table>
           <TableHead>
             <TableRow>

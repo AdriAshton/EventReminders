@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { ensureValidSession } from "@/lib/authClient";
 
-const PUBLIC_PATH_PREFIXES = ["/login", "/signup", "/forgot", "/reset"];
+const PUBLIC_PATH_PREFIXES = ["/login", "/forgot", "/reset"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-06-14
+Last updated: 2026-06-16
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -18,7 +18,6 @@ This file is a best-effort reconstruction of work completed in this project base
   - `app/events`
   - `app/login`
   - `app/reminders`
-  - `app/signup`
   - `app/users`
 - The project contains API route folders for:
   - `app/api/auth`
@@ -131,6 +130,29 @@ From `git status --short` inside the project:
 - The users page includes a dedicated change-password flow with `New Password` and `Confirm Password` fields during edit.
 
 ## Verified Fixes Made During This Chat
+
+### Theme, login, and dashboard UX
+- Replaced the old binary theme toggle with a dropdown in `app/settings/page.tsx` that supports `Purple`, `Red`, and `Green`.
+- Updated `app/components/ThemeProviderClient.tsx` so the selected theme color drives the palette and page background.
+- Removed the old authenticated theme write-back that was causing redirect-like behavior when changing theme colors.
+- Updated `app/dashboard/page.tsx` so the hero banner and action buttons use the active theme palette and stand out more clearly.
+- Changed the dashboard identity label to uppercase display text while leaving the stored username unchanged.
+- Updated the login screen 2FA action copy to friendlier wording and added a hover highlight for the forgot-password link.
+
+### Security and 2FA
+- Split 2FA into user-level controls only.
+- Added `/api/auth/2fa/disable` so a signed-in user can disable 2FA for their own account.
+- Removed the admin-wide 2FA enforcement UI and routes.
+- Updated the settings screen so regular users only see the `My account` 2FA controls.
+- Gated the `Security settings` tab so only administrators can see it.
+- Updated login so it checks only the user’s own 2FA state.
+
+### Date display and privacy
+- Standardized visible date rendering to `mm-dd-yyyy` across dashboard, event, reminder, and birthday template preview surfaces.
+- Masked client email and phone values in the client list and client detail page while leaving edit/import fields intact.
+
+### Reliability and fallback pages
+- Added a minimal `pages/500.tsx` fallback so Next generates the `/500` static asset and no longer errors on missing `500.html`.
 
 ### `app/clients/page.tsx`
 A Material UI typing issue was investigated and the current file shows the correct direction for the installed MUI version:
