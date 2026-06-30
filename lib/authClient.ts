@@ -12,7 +12,17 @@ export function getStoredToken() {
     return null;
   }
 
-  return localStorage.getItem(TOKEN_KEY);
+  const localToken = localStorage.getItem(TOKEN_KEY);
+  if (localToken) {
+    return localToken;
+  }
+
+  const cookieToken = document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(`${AUTH_COOKIE_KEY}=`))
+    ?.split("=")[1];
+
+  return cookieToken ? decodeURIComponent(cookieToken) : null;
 }
 
 export function getTokenPayload(token?: string | null) {

@@ -17,8 +17,8 @@ export async function getCompanies() {
 // POST new company
 export async function addCompany(company: {
   companyname: string;
-  contactemail?: string;
-  contactphone?: string;
+  contactemail: string;
+  contactphone: string;
 }) {
   const res = await authenticatedFetch("/api/companies", {
     method: "POST",
@@ -38,8 +38,8 @@ export async function addCompany(company: {
 export async function updateCompany(company: {
   companyid: number;
   companyname: string;
-  contactemail?: string;
-  contactphone?: string;
+  contactemail: string;
+  contactphone: string;
 }) {
   const res = await authenticatedFetch("/api/companies", {
     method: "PUT",

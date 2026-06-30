@@ -2,10 +2,17 @@
 
 import { authenticatedFetch } from "@/lib/authClient";
 
-export async function getClients(page = 1, pageSize = 10) {
-  const url = `/api/clients?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
-    String(pageSize),
-  )}`;
+export async function getClients(page = 1, pageSize = 10, filters?: { firstname?: string; lastname?: string; birthdate?: string }) {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  if (filters?.firstname) searchParams.set("firstname", filters.firstname);
+  if (filters?.lastname) searchParams.set("lastname", filters.lastname);
+  if (filters?.birthdate) searchParams.set("birthdate", filters.birthdate);
+
+  const url = `/api/clients?${searchParams.toString()}`;
 
   const res = await authenticatedFetch(url, {
     method: 'GET',
@@ -15,6 +22,17 @@ export async function getClients(page = 1, pageSize = 10) {
     return { error: data.error || 'Failed to fetch clients' };
   }
   // expected shape: { rows: [...], total: number }
+  return data;
+}
+
+export async function getClientFilterValues() {
+  const res = await authenticatedFetch("/api/clients?distinct=1", {
+    method: "GET",
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    return { error: data.error || "Failed to fetch client filter values" };
+  }
   return data;
 }
 
@@ -34,6 +52,7 @@ export async function addClient(client: {
   lastname: string;
   email: string;
   phone: string;
+  birthdate?: string;
   companyId: number;
 }) {
   const res = await authenticatedFetch("/api/clients", {
@@ -56,6 +75,7 @@ export async function updateClient(client: {
   lastname: string;
   email: string;
   phone: string;
+  birthdate?: string;
   companyId: number;
 }) {
   const res = await authenticatedFetch("/api/clients", {

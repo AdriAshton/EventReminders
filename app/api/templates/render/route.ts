@@ -44,8 +44,8 @@ export async function POST(req: Request) {
     }
 
     const reminderResult = await pool.query(
-      'SELECT reminderid, eventid, companyid FROM reminders WHERE reminderid = $1 AND companyid = $2',
-      [reminderId, decoded.companyid],
+      'SELECT reminderid, clientid FROM reminders WHERE reminderid = $1',
+      [reminderId],
     );
 
     if (reminderResult.rows.length === 0) {
@@ -54,42 +54,26 @@ export async function POST(req: Request) {
 
     const reminder = reminderResult.rows[0];
 
-    const eventResult = await pool.query(
-      'SELECT eventid, clientid, eventdate FROM events WHERE eventid = $1 AND companyid = $2',
-      [reminder.eventid, decoded.companyid],
-    );
-
-    if (eventResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Event not found for reminder' }, { status: 404 });
-    }
-
-    const event = eventResult.rows[0];
-
     const [clientResult, companyResult] = await Promise.all([
       pool.query(
-        'SELECT clientid, firstname, lastname FROM clients WHERE clientid = $1 AND companyid = $2',
-        [event.clientid, decoded.companyid],
+        'SELECT clientid, firstname, lastname, birthdate FROM clients WHERE clientid = $1',
+        [reminder.clientid],
       ),
-      pool.query(
-        'SELECT companyid, companyname FROM companies WHERE companyid = $1',
-        [decoded.companyid],
-      ),
+      pool.query('SELECT companyid, companyname, contactemail, contactphone FROM companies ORDER BY companyid ASC LIMIT 1'),
     ]);
 
     if (clientResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Client not found for event' }, { status: 404 });
+      return NextResponse.json({ error: 'Client not found for reminder' }, { status: 404 });
     }
 
     const client = clientResult.rows[0];
     const company = companyResult.rows[0];
     const clientName = [client.firstname, client.lastname].filter(Boolean).join(' ').trim();
-    const senderName = decoded.username || decoded.email || 'Customer Care Team';
 
     const values = {
       clientName,
       companyName: company?.companyname || 'Your Company',
-      senderName,
-      eventDate: formatEventDate(event.eventdate),
+      eventDate: formatEventDate(client.birthdate),
     };
 
     return NextResponse.json({

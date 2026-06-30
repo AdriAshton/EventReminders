@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Box, Typography, Switch, FormControlLabel, Card, CardContent, Button, Stack, FormControl, InputLabel, MenuItem, Select, Alert } from "@mui/material";
+import { Box, Typography, Switch, FormControlLabel, Card, CardContent, Button, Stack, FormControl, InputLabel, MenuItem, Select, Alert, TextField, Snackbar } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch, getStoredToken } from "@/lib/authClient";
 import { getTokenPayload } from "@/lib/authClient";
@@ -12,6 +12,14 @@ export default function SettingsPage() {
   });
   const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(false);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [reminderChannel, setReminderChannel] = useState<"Email" | "WhatsApp">("Email");
+  const [reminderSendTime, setReminderSendTime] = useState<string>("09:00");
+  const [reminderSaving, setReminderSaving] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const router = useRouter();
   const tokenPayload = getTokenPayload();
   const currentUserId = tokenPayload?.userid ? String(tokenPayload.userid) : "";
@@ -39,6 +47,12 @@ export default function SettingsPage() {
         const userSettingsRes = await authenticatedFetch('/api/users/settings');
         const userSettings = await userSettingsRes.json();
         setTwoFactorEnabled(!!userSettings?.twoFactor?.enabled);
+        const reminderSettingsRes = await fetch('/api/settings/reminder-delivery');
+        const reminderSettings = await reminderSettingsRes.json();
+        if (reminderSettingsRes.ok) {
+          setReminderChannel(reminderSettings.channel === 'WhatsApp' ? 'WhatsApp' : 'Email');
+          setReminderSendTime(reminderSettings.sendTime || '09:00');
+        }
       } catch {
         // ignore
       }
@@ -117,6 +131,29 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveReminderDelivery() {
+    setReminderSaving(true);
+    try {
+      const res = await fetch('/api/settings/reminder-delivery', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sendTime: reminderSendTime, channel: reminderChannel }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast({ open: true, message: data?.error || 'Failed to save reminder delivery settings', severity: 'error' });
+        return;
+      }
+      setReminderChannel(data.channel === 'WhatsApp' ? 'WhatsApp' : 'Email');
+      setReminderSendTime(data.sendTime || '09:00');
+      setToast({ open: true, message: 'Reminder delivery settings updated', severity: 'success' });
+    } catch {
+      setToast({ open: true, message: 'Failed to save reminder delivery settings', severity: 'error' });
+    } finally {
+      setReminderSaving(false);
+    }
+  }
+
   return (
     <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, maxWidth: 1200, mx: 'auto' }}>
       <Box sx={{ mb: 3 }}>
@@ -149,7 +186,7 @@ export default function SettingsPage() {
             <Typography variant="h6">Security</Typography>
             {securityMessage && <Alert severity="info" sx={{ mb: 2 }}>{securityMessage}</Alert>}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" component="div">
                 Control 2FA for your own account.
               </Typography>
               <FormControlLabel
@@ -181,18 +218,36 @@ export default function SettingsPage() {
 
         <Card>
           <CardContent>
-            <Typography variant="h6">Messaging</Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Configure reusable birthday message templates with placeholder preview.
+            <Typography variant="h6">Reminder Delivery</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Set the global channel and send time used for all birthday reminders and draft messages.
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button variant="contained" onClick={() => router.push('/settings/templates')}>
-                Open Template Editor
-              </Button>
-              <Button variant="outlined" onClick={() => router.push('/settings/email')}>
-                Choose Email Provider
-              </Button>
-            </Box>
+            <Stack spacing={2} sx={{ maxWidth: 360 }}>
+              <FormControl fullWidth>
+                <InputLabel id="reminder-channel-label">Channel</InputLabel>
+                <Select
+                  labelId="reminder-channel-label"
+                  value={reminderChannel}
+                  label="Channel"
+                  onChange={(e) => setReminderChannel(e.target.value === 'WhatsApp' ? 'WhatsApp' : 'Email')}
+                >
+                  <MenuItem value="Email">Email</MenuItem>
+                  <MenuItem value="WhatsApp">WhatsApp</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Time To Be Sent"
+                type="time"
+                value={reminderSendTime}
+                onChange={(e) => setReminderSendTime(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <Box>
+                <Button variant="contained" onClick={saveReminderDelivery} disabled={reminderSaving}>
+                  {reminderSaving ? 'Saving...' : 'Save Reminder Delivery'}
+                </Button>
+              </Box>
+            </Stack>
           </CardContent>
         </Card>
 
@@ -200,6 +255,16 @@ export default function SettingsPage() {
           <Button variant="outlined" onClick={() => router.push('/dashboard')}>Back to Dashboard</Button>
         </Box>
       </Stack>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3000}
+        onClose={() => setToast((current) => ({ ...current, open: false }))}
+      >
+        <Alert severity={toast.severity} onClose={() => setToast((current) => ({ ...current, open: false }))}>
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

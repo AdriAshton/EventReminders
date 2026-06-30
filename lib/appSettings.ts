@@ -8,6 +8,7 @@ export type MessageTemplate = {
   name: string;
   subject: string;
   body: string;
+  imageUrl?: string;
 };
 
 export type EmailProvider = 'mailtrap' | 'gmail';
@@ -16,9 +17,17 @@ export type EmailSettings = {
   provider: EmailProvider;
 };
 
+export type ReminderChannel = 'Email' | 'WhatsApp';
+
+export type ReminderDeliverySettings = {
+  sendTime: string;
+  channel: ReminderChannel;
+};
+
 export type AppSettings = {
   twoFactorGlobal: boolean;
   email: EmailSettings;
+  reminderDelivery: ReminderDeliverySettings;
   messageTemplates: {
     activeTemplateId: string;
     templates: MessageTemplate[];
@@ -29,7 +38,7 @@ const DEFAULT_TEMPLATE: MessageTemplate = {
   id: 'birthday-default',
   name: 'Default Birthday Template',
   subject: 'Happy Birthday, {{clientName}}!',
-  body: 'Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}',
+  body: 'Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,',
 };
 
 type RawTemplateShape = {
@@ -37,6 +46,7 @@ type RawTemplateShape = {
   name?: unknown;
   subject?: unknown;
   body?: unknown;
+  imageUrl?: unknown;
 };
 
 type RawTemplateCollection = {
@@ -47,6 +57,7 @@ type RawTemplateCollection = {
 
 type RawSettingsShape = {
   email?: unknown;
+  reminderDelivery?: unknown;
   messageTemplates?: RawTemplateCollection;
   twoFactorGlobal?: unknown;
 };
@@ -56,6 +67,10 @@ function getDefaultSettings(): AppSettings {
     twoFactorGlobal: false,
     email: {
       provider: 'mailtrap' as EmailProvider,
+    },
+    reminderDelivery: {
+      sendTime: '09:00',
+      channel: 'Email',
     },
     messageTemplates: {
       activeTemplateId: DEFAULT_TEMPLATE.id,
@@ -70,6 +85,19 @@ function normalizeEmailSettings(rawEmail: unknown): EmailSettings {
   return { provider };
 }
 
+function normalizeReminderDelivery(rawReminderDelivery: unknown): ReminderDeliverySettings {
+  const candidate = typeof rawReminderDelivery === 'object' && rawReminderDelivery !== null
+    ? rawReminderDelivery as { sendTime?: unknown; channel?: unknown }
+    : {};
+
+  const sendTime = typeof candidate.sendTime === 'string' && /^\d{2}:\d{2}$/.test(candidate.sendTime)
+    ? candidate.sendTime
+    : '09:00';
+  const channel = candidate.channel === 'WhatsApp' ? 'WhatsApp' : 'Email';
+
+  return { sendTime, channel };
+}
+
 function normalizeTemplates(rawTemplates: RawTemplateCollection | undefined): { activeTemplateId: string; templates: MessageTemplate[] } {
   if (Array.isArray(rawTemplates?.templates)) {
     const templates = rawTemplates.templates
@@ -79,6 +107,7 @@ function normalizeTemplates(rawTemplates: RawTemplateCollection | undefined): { 
         name: String(template.name),
         subject: String(template.subject || ''),
         body: String(template.body || ''),
+        imageUrl: typeof template.imageUrl === 'string' ? template.imageUrl : '',
       }));
 
     if (templates.length > 0) {
@@ -98,6 +127,7 @@ function normalizeTemplates(rawTemplates: RawTemplateCollection | undefined): { 
           name: String(rawTemplates.birthdayDefault.name || DEFAULT_TEMPLATE.name),
           subject: String(rawTemplates.birthdayDefault.subject || DEFAULT_TEMPLATE.subject),
           body: String(rawTemplates.birthdayDefault.body || DEFAULT_TEMPLATE.body),
+          imageUrl: '',
         },
       ],
     };
@@ -118,12 +148,14 @@ export function readSettings(): AppSettings {
     const parsed = JSON.parse(raw || '{}') as RawSettingsShape;
     const templates = normalizeTemplates(parsed?.messageTemplates);
     const email = normalizeEmailSettings(parsed?.email);
+    const reminderDelivery = normalizeReminderDelivery(parsed?.reminderDelivery);
     const twoFactorGlobal = parsed?.twoFactorGlobal === true;
     return {
       ...getDefaultSettings(),
       ...parsed,
       twoFactorGlobal,
       email,
+      reminderDelivery,
       messageTemplates: templates,
     };
   } catch {
@@ -146,9 +178,9 @@ export function upsertMessageTemplate(template: MessageTemplate) {
   const existingIndex = messageTemplates.templates.findIndex((item: MessageTemplate) => item.id === template.id);
 
   if (existingIndex >= 0) {
-    messageTemplates.templates[existingIndex] = template;
+    messageTemplates.templates[existingIndex] = { ...messageTemplates.templates[existingIndex], ...template, imageUrl: template.imageUrl || '' };
   } else {
-    messageTemplates.templates.push(template);
+    messageTemplates.templates.push({ ...template, imageUrl: template.imageUrl || '' });
   }
 
   if (!messageTemplates.activeTemplateId) {
@@ -191,9 +223,21 @@ export function getEmailSettings(): EmailSettings {
   return normalizeEmailSettings(settings.email);
 }
 
+export function getReminderDeliverySettings(): ReminderDeliverySettings {
+  const settings = readSettings();
+  return normalizeReminderDelivery(settings.reminderDelivery);
+}
+
 export function setEmailProvider(provider: EmailProvider) {
   const settings = readSettings();
   settings.email = normalizeEmailSettings({ provider });
   writeSettings(settings);
   return settings.email as EmailSettings;
+}
+
+export function setReminderDeliverySettings(reminderDelivery: ReminderDeliverySettings) {
+  const settings = readSettings();
+  settings.reminderDelivery = normalizeReminderDelivery(reminderDelivery);
+  writeSettings(settings);
+  return settings.reminderDelivery as ReminderDeliverySettings;
 }

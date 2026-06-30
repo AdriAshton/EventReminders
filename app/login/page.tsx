@@ -11,14 +11,14 @@ import {
 } from "@mui/material";
 import { setStoredToken } from "@/lib/authClient";
 import { login } from "@/services/auth"; // adjust path if needed
-import { useRouter } from "next/navigation"; // import router
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [preAuthUserId, setPreAuthUserId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const router = useRouter(); // initialize router
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -42,7 +42,8 @@ export default function LoginPage() {
       setSuccess("Login successful!");
 
       // Redirect to dashboard
-      router.push("/dashboard");
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      window.location.assign("/dashboard");
     } catch (err: any) {
       setError(err.message);
     }
@@ -58,7 +59,8 @@ export default function LoginPage() {
       const j = await res.json();
       if (j.verified && j.token) {
         setStoredToken(j.token);
-        router.push('/dashboard');
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+        window.location.assign('/dashboard');
       } else {
         setError('Invalid 2FA code');
       }

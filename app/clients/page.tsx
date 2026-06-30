@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 
 import {
   getClients,
+  getClientFilterValues,
   addClient,
   deleteClient,
   deleteClients,
@@ -39,29 +40,47 @@ import {
 
 export default function ClientsPage() {
   const router = useRouter();
+  const [themeColor, setThemeColor] = useState<"purple" | "red" | "green">("purple");
   const [clients, setClients] = useState<any[]>([]);
-  const [pkFilter, setPkFilter] = useState<number | string>("");
-  const [fkFilter, setFkFilter] = useState<number | string>("");
+  const [firstNameFilter, setFirstNameFilter] = useState<string>("");
+  const [lastNameFilter, setLastNameFilter] = useState<string>("");
+  const [birthdateFilter, setBirthdateFilter] = useState<string>("");
+  const [sortField, setSortField] = useState<"firstname" | "lastname" | "birthdate">("firstname");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [total, setTotal] = useState<number>(0);
+  const [filterValues, setFilterValues] = useState<{ firstnames: string[]; lastnames: string[]; birthdates: string[] }>({
+    firstnames: [],
+    lastnames: [],
+    birthdates: [],
+  });
   const [newClient, setNewClient] = useState({
     firstname: "",
     lastname: "",
     email: "",
     phone: "",
+    birthdate: "",
     companyId: 1,
   });
 
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
   );
   const [importErrors, setImportErrors] = useState<Array<{row:number,reason:string,raw?:string}>>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+
+  const paginationSelectedColor = {
+    purple: "#5b5fe8",
+    red: "#e11d48",
+    green: "#16a34a",
+  }[themeColor];
 
   function maskEmail(email: string | null | undefined) {
     if (!email) return "";
@@ -78,9 +97,124 @@ export default function ClientsPage() {
     return `${"*".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
   }
 
+  function formatPhoneForEdit(phone: string | null | undefined) {
+    if (!phone) return "";
+    const digits = String(phone).replace(/\D/g, "");
+    if (digits.length <= 4) return digits;
+    return `${digits.slice(0, digits.length - 4)}-${digits.slice(-4)}`;
+  }
+
+  function normalizePhone(phone: string | null | undefined) {
+    return phone ? String(phone).replace(/\D/g, "") : "";
+  }
+
+  function formatBirthdateForEdit(birthdate: string | null | undefined) {
+    if (!birthdate) return "";
+    const raw = String(birthdate).trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) {
+      return isoMatch[1];
+    }
+
+    const parts = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (parts) {
+      const month = parts[1].padStart(2, "0");
+      const day = parts[2].padStart(2, "0");
+      return `${parts[3]}-${month}-${day}`;
+    }
+
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  }
+
+  function isFutureBirthdate(birthdate: string | null | undefined) {
+    if (!birthdate) return false;
+    const date = new Date(String(birthdate));
+    if (Number.isNaN(date.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    return date > today;
+  }
+
+  function handleSort(field: "firstname" | "lastname" | "birthdate") {
+    if (sortField === field) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortField(field);
+    setSortDirection(field === "birthdate" ? "asc" : "asc");
+  }
+
+  function compareValues(left: any, right: any) {
+    const leftText = String(left || "").trim().toLowerCase();
+    const rightText = String(right || "").trim().toLowerCase();
+    return leftText.localeCompare(rightText);
+  }
+  const sortedClients = [...clients]
+    .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
+    .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
+    .filter((c) => (birthdateFilter === "" ? true : new Date(c.birthdate).toLocaleDateString() === birthdateFilter))
+    .sort((left, right) => {
+      const firstNameCompare = compareValues(left.firstname, right.firstname);
+      const lastNameCompare = compareValues(left.lastname, right.lastname);
+
+      const birthdateCompare = (() => {
+        const leftDate = left.birthdate ? new Date(left.birthdate).getTime() : 0;
+        const rightDate = right.birthdate ? new Date(right.birthdate).getTime() : 0;
+        return leftDate - rightDate;
+      })();
+
+      let result = 0;
+      if (sortField === "firstname") {
+        result = firstNameCompare || lastNameCompare || birthdateCompare;
+      } else if (sortField === "lastname") {
+        result = lastNameCompare || firstNameCompare || birthdateCompare;
+      } else if (sortField === "birthdate") {
+        result = birthdateCompare || firstNameCompare || lastNameCompare;
+      }
+
+      return sortDirection === "asc" ? result : -result;
+    });
+
   useEffect(() => {
     loadClients(page);
   }, [page]);
+
+  useEffect(() => {
+    loadClients(1);
+    setPage(1);
+  }, [firstNameFilter, lastNameFilter, birthdateFilter, pageSize]);
+
+  useEffect(() => {
+    loadFilterValues();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const resolveThemeColor = () => {
+      const stored = localStorage.getItem("themeColor") || localStorage.getItem("theme");
+      if (stored === "red" || stored === "green" || stored === "purple") {
+        return stored;
+      }
+      return "purple";
+    };
+
+    const syncTheme = () => setThemeColor(resolveThemeColor());
+
+    syncTheme();
+    window.addEventListener("theme-change", syncTheme);
+    return () => window.removeEventListener("theme-change", syncTheme);
+  }, []);
 
   useEffect(() => {
     // read the edit query param from the browser location (client-only)
@@ -89,12 +223,22 @@ export default function ClientsPage() {
     const edit = params.get("edit");
     if (edit && clients.length) {
       const found = clients.find((c) => String(c.clientid) === edit);
-      if (found) setEditingClient(found);
+      if (found) {
+        setEditingClient({
+          ...found,
+          phone: formatPhoneForEdit(found.phone),
+          birthdate: formatBirthdateForEdit(found.birthdate),
+        });
+      }
     }
   }, [clients]);
 
   async function loadClients(pageParam: number = page) {
-    const data = await getClients(pageParam, pageSize);
+    const data = await getClients(pageParam, pageSize, {
+      firstname: firstNameFilter,
+      lastname: lastNameFilter,
+      birthdate: birthdateFilter,
+    });
 
     if (data.error) {
       setError(data.error);
@@ -106,11 +250,35 @@ export default function ClientsPage() {
     }
   }
 
+  async function loadFilterValues() {
+    const data = await getClientFilterValues();
+
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
+
+    setFilterValues({
+      firstnames: Array.isArray(data.firstnames) ? data.firstnames : [],
+      lastnames: Array.isArray(data.lastnames) ? data.lastnames : [],
+      birthdates: Array.isArray(data.birthdates) ? data.birthdates : [],
+    });
+  }
+
   async function handleAdd() {
+    setDialogError(null);
+    if (isFutureBirthdate(newClient.birthdate)) {
+      const message = "Birthdate cannot be in the future";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
     const res = await addClient(newClient);
 
     if (res.error) {
       setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadClients();
 
@@ -119,8 +287,10 @@ export default function ClientsPage() {
         lastname: "",
         email: "",
         phone: "",
+        birthdate: "",
         companyId: 1,
       });
+      setAddDialogOpen(false);
       setToast({ open: true, message: "Client created successfully", severity: "success" });
     }
   }
@@ -139,10 +309,22 @@ export default function ClientsPage() {
   async function handleUpdate() {
     if (!editingClient) return;
 
-    const res = await updateClient(editingClient);
+    setDialogError(null);
+    if (isFutureBirthdate(editingClient.birthdate)) {
+      const message = "Birthdate cannot be in the future";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    const res = await updateClient({
+      ...editingClient,
+      phone: normalizePhone(editingClient.phone),
+    });
 
     if (res.error) {
       setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadClients();
       setEditingClient(null);
@@ -165,10 +347,85 @@ export default function ClientsPage() {
     },
   };
 
+  const dialogTextFieldProps = {
+    slotProps: {
+      input: {
+        sx: {
+          color: "#111827",
+          "& input": {
+            color: "#111827",
+            WebkitTextFillColor: "#111827",
+          },
+        },
+      },
+      inputLabel: {
+        sx: {
+          color: "#4b5563",
+          fontWeight: 600,
+          "&.Mui-focused": {
+            color: "#111827",
+          },
+        },
+        shrink: true,
+      },
+    },
+  };
+
+  const dialogDateFieldProps = {
+    ...dialogTextFieldProps,
+    slotProps: {
+      ...dialogTextFieldProps.slotProps,
+      input: {
+        sx: {
+          color: "#111827",
+          "& input": {
+            color: "#111827",
+            WebkitTextFillColor: "#111827",
+          },
+          "& input::-webkit-datetime-edit": {
+            color: "#111827",
+          },
+          "& input::-webkit-datetime-edit-text": {
+            color: "#111827",
+          },
+          "& input::-webkit-datetime-edit-month-field": {
+            color: "#111827",
+          },
+          "& input::-webkit-datetime-edit-day-field": {
+            color: "#111827",
+          },
+          "& input::-webkit-datetime-edit-year-field": {
+            color: "#111827",
+          },
+        },
+      },
+      inputLabel: {
+        sx: {
+          color: "#4b5563",
+          fontWeight: 600,
+          "&.Mui-focused": {
+            color: "#111827",
+          },
+        },
+        shrink: true,
+      },
+    },
+  };
+
   return (
     <Box sx={{ p: 3 }}>
+      <Typography variant="h4" sx={{ mb: 2 }}>
+        Clients
+      </Typography>
+
+    
+      <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+        This screen shows the list of clients with options to add, import, filter, and bulk-manage clients.
+      </Typography>
+
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
         <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+        <Button variant="contained" onClick={() => setAddDialogOpen(true)}>Add Client</Button>
         <Button component="span" variant="contained" onClick={() => document.getElementById('clients-import-input')?.click()}>Import</Button>
         <input
           id="clients-import-input"
@@ -208,7 +465,7 @@ export default function ClientsPage() {
                 return;
               }
               const header = lines[0].split(',').map(h => h.trim().toLowerCase());
-              const required = ['firstname','lastname','email','phone','companyid'];
+              const required = ['firstname','lastname','email','phone','birthdate'];
               const missing = required.filter(r => !header.includes(r));
               if (missing.length) {
                 setToast({ open: true, message: `Missing columns: ${missing.join(', ')}`, severity: 'error' });
@@ -225,13 +482,13 @@ export default function ClientsPage() {
               const failures: Array<{row:number,reason:string,raw?:string}> = [];
               let rowIndex = 1;
               for (const r of rows) {
-                if (!r.firstname || !r.lastname || !r.email) {
+                if (!r.firstname || !r.lastname || !r.email || !r.birthdate) {
                   failures.push({ row: rowIndex, reason: 'Missing required fields', raw: JSON.stringify(r) });
                   rowIndex++;
                   continue;
                 }
                 try {
-                  const res = await addClient({ firstname: r.firstname, lastname: r.lastname, email: r.email, phone: r.phone || '', companyId: Number(r.companyid) || 1 });
+                  const res = await addClient({ firstname: r.firstname, lastname: r.lastname, email: r.email, phone: r.phone || '', birthdate: r.birthdate, companyId: Number(r.companyid) || 1 });
                   if ((res as any).error) failures.push({ row: rowIndex, reason: (res as any).error, raw: JSON.stringify(r) }); else success++;
                 } catch (err: any) {
                   failures.push({ row: rowIndex, reason: err?.message || 'Unknown error', raw: JSON.stringify(r) });
@@ -254,6 +511,8 @@ export default function ClientsPage() {
 
       {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
 
+      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
+
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <FormControl size="small" sx={{ minWidth: 120 }}>
           <InputLabel id="rows-per-page-label">Rows</InputLabel>
@@ -266,23 +525,62 @@ export default function ClientsPage() {
 
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <Button color="error" disabled={selectedIds.length === 0} onClick={() => setConfirmBulkOpen(true)}>Delete Selected ({selectedIds.length})</Button>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="pk-filter-label">Primary Key</InputLabel>
-            <Select labelId="pk-filter-label" value={pkFilter} label="Primary Key" onChange={(e) => { const val = e.target.value as unknown as string; setPkFilter(val === "" ? "" : Number(val)); }} sx={{ color: '#000', backgroundColor: '#fff' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="first-name-filter-label">First Name</InputLabel>
+            <Select
+              labelId="first-name-filter-label"
+              value={firstNameFilter}
+              label="First Name"
+              onChange={(e) => setFirstNameFilter(String(e.target.value))}
+              sx={{ color: '#000', backgroundColor: '#fff' }}
+            >
               <MenuItem value="">All</MenuItem>
-              {clients.map((c) => <MenuItem key={c.clientid} value={c.clientid}>{String(c.clientid)}</MenuItem>)}
+              {filterValues.firstnames.map((name) => (
+                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="fk-filter-label">Foreign Key (companyId)</InputLabel>
-            <Select labelId="fk-filter-label" value={fkFilter} label="Foreign Key (companyId)" onChange={(e) => { const val = e.target.value as unknown as string; setFkFilter(val === "" ? "" : Number(val)); }} sx={{ color: '#000', backgroundColor: '#fff' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="last-name-filter-label">Last Name</InputLabel>
+            <Select
+              labelId="last-name-filter-label"
+              value={lastNameFilter}
+              label="Last Name"
+              onChange={(e) => setLastNameFilter(String(e.target.value))}
+              sx={{ color: '#000', backgroundColor: '#fff' }}
+            >
               <MenuItem value="">All</MenuItem>
-              {[...new Set(clients.map((c) => c.companyid))].map((compId) => <MenuItem key={compId} value={compId}>{String(compId)}</MenuItem>)}
+              {filterValues.lastnames.map((name) => (
+                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+  <InputLabel id="birthdate-filter-label">
+    Birthdate
+  </InputLabel>
+  <Select
+    labelId="birthdate-filter-label"
+    value={birthdateFilter}
+    label="Birthdate"
+    onChange={(e) => setBirthdateFilter(String(e.target.value))}
+    sx={{
+      color: "#000",
+      backgroundColor: "#fff",
+    }}
+  >
+    <MenuItem value="">All</MenuItem>
+
+    {filterValues.birthdates.map((date) => (
+        <MenuItem key={date} value={date}>
+          {date}
+        </MenuItem>
+      ))}
+  </Select>
+</FormControl>
         </Box>
 
-        <Pagination count={Math.max(1, Math.ceil(total / pageSize))} page={page} onChange={(_, value) => { setPage(value); loadClients(value); }} sx={{ '& .MuiPaginationItem-root': { color: '#000', backgroundColor: '#fff' }, '& .Mui-selected': { backgroundColor: '#1976d2 !important', color: '#fff' }, boxShadow: 1, borderRadius: 1 }} showFirstButton showLastButton />
+        <Pagination count={Math.max(1, Math.ceil(total / pageSize))} page={page} onChange={(_, value) => { setPage(value); loadClients(value); }} sx={{ '& .MuiPaginationItem-root': { color: '#000', backgroundColor: '#fff' }, '& .Mui-selected': { backgroundColor: `${paginationSelectedColor} !important`, color: '#fff' }, boxShadow: 1, borderRadius: 1 }} showFirstButton showLastButton />
       </Box>
 
       <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
@@ -290,25 +588,38 @@ export default function ClientsPage() {
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox"><Checkbox indeterminate={selectedIds.length > 0 && selectedIds.length < clients.length} checked={clients.length > 0 && selectedIds.length === clients.length} onChange={(e) => { if (e.target.checked) setSelectedIds(clients.map((c) => c.clientid)); else setSelectedIds([]); }} /></TableCell>
-              <TableCell>First Name</TableCell>
-              <TableCell>Last Name</TableCell>
+              <TableCell sx={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort("firstname")}>
+                First Name{sortField === "firstname" ? (sortDirection === "asc" ? " ▲" : " ▼") : ""}
+              </TableCell>
+              <TableCell sx={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort("lastname")}>
+                Last Name{sortField === "lastname" ? (sortDirection === "asc" ? " ▲" : " ▼") : ""}
+              </TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
+              <TableCell sx={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort("birthdate")}>
+                Birthdate{sortField === "birthdate" ? (sortDirection === "asc" ? " ▲" : " ▼") : ""}
+              </TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {clients.filter((c) => (pkFilter === "" ? true : c.clientid === pkFilter)).filter((c) => (fkFilter === "" ? true : c.companyid === fkFilter)).map((c) => (
-              <TableRow key={c.clientid} hover selected={editingClient?.clientid === c.clientid} onClick={() => router.push(`/clients/${c.clientid}`)} sx={{ cursor: 'pointer', '&.Mui-selected': { backgroundColor: '#1e88e5', color: '#fff' } }}>
+            {sortedClients.map((c) => (
+              <TableRow
+                key={c.clientid}
+                hover
+                selected={editingClient?.clientid === c.clientid}
+                onDoubleClick={() => setEditingClient(c)}
+                sx={{ cursor: 'pointer', '&.Mui-selected': { backgroundColor: '#1e88e5', color: '#fff' } }}
+              >
                 <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}><Checkbox checked={selectedIds.includes(c.clientid)} onChange={(e) => { const checked = e.target.checked; setSelectedIds((prev) => checked ? [...prev, c.clientid] : prev.filter(id => id !== c.clientid)); }} /></TableCell>
                 <TableCell>{c.firstname}</TableCell>
                 <TableCell>{c.lastname}</TableCell>
                 <TableCell>{maskEmail(c.email)}</TableCell>
                 <TableCell>{maskPhone(c.phone)}</TableCell>
+                <TableCell>{c.birthdate ? new Date(c.birthdate).toLocaleDateString() : ''}</TableCell>
                 <TableCell align="right">
                   <Button color="error" onClick={(e) => { e.stopPropagation(); if (!window.confirm("Are you sure you want to delete this client?")) return; handleDelete(c.clientid); }}>Delete</Button>
-                  <Button onClick={(e) => { e.stopPropagation(); setEditingClient(c); }}>Edit</Button>
-                  <Button onClick={(e) => { e.stopPropagation(); router.push(`/clients/${c.clientid}`); }}>View</Button>
+                  <Button onClick={(e) => { e.stopPropagation(); setEditingClient(c); }}>View/Edit</Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -316,7 +627,20 @@ export default function ClientsPage() {
         </Table>
       </TableContainer>
 
-      <Dialog open={confirmBulkOpen} onClose={() => setConfirmBulkOpen(false)}>
+      <Dialog
+        open={confirmBulkOpen}
+        onClose={() => setConfirmBulkOpen(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: "#fff",
+              color: "#111827",
+              opacity: 1,
+              boxShadow: 24,
+            },
+          },
+        }}
+      >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent><Typography>Are you sure you want to delete {selectedIds.length} selected clients? This action cannot be undone.</Typography></DialogContent>
         <DialogActions>
@@ -325,30 +649,91 @@ export default function ClientsPage() {
         </DialogActions>
       </Dialog>
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-        <Pagination count={Math.max(1, Math.ceil(total / pageSize))} page={page} onChange={(_, value) => { setPage(value); loadClients(value); }} sx={{ '& .MuiPaginationItem-root': { color: '#fff' }, '& .MuiPaginationItem-previousNext': { color: '#fff' }, '& .MuiPaginationItem-icon': { color: '#fff' }, '& .Mui-selected': { backgroundColor: '#1976d2 !important', color: '#fff' }, '& .MuiPagination-ul': { justifyContent: 'center' }, backgroundColor: 'transparent', py: 1 }} showFirstButton showLastButton />
-      </Box>
-
-      <Typography variant="h6" gutterBottom>Add Client</Typography>
-      <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap' }}>
-        <TextField label="First Name" value={newClient.firstname} onChange={(e) => setNewClient({ ...newClient, firstname: e.target.value })} {...textFieldProps} />
-        <TextField label="Last Name" value={newClient.lastname} onChange={(e) => setNewClient({ ...newClient, lastname: e.target.value })} {...textFieldProps} />
-        <TextField label="Email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} {...textFieldProps} />
-        <TextField label="Phone" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} {...textFieldProps} />
-        <Button variant="contained" onClick={handleAdd}>Add</Button>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, px: 2 }}>
+        <Pagination
+          count={Math.max(1, Math.ceil(total / pageSize))}
+          page={page}
+          onChange={(_, value) => { setPage(value); loadClients(value); }}
+          sx={{
+            '& .MuiPagination-ul': {
+              justifyContent: 'center',
+              gap: 0.5,
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              border: '1px solid rgba(17,24,39,0.12)',
+              borderRadius: 999,
+              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.12)',
+              px: 1,
+              py: 0.75,
+            },
+            '& .MuiPaginationItem-root': {
+              color: '#1f2937',
+              fontWeight: 700,
+            },
+            '& .MuiPaginationItem-previousNext, & .MuiPaginationItem-icon': {
+              color: '#1f2937',
+            },
+            '& .Mui-selected': {
+              backgroundColor: `${paginationSelectedColor} !important`,
+              color: '#fff !important',
+            },
+          }}
+          showFirstButton
+          showLastButton
+        />
       </Box>
 
       {editingClient && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>Edit Client</Typography>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField label="First Name" value={editingClient.firstname} onChange={(e) => setEditingClient({ ...editingClient, firstname: e.target.value })} {...textFieldProps} />
-            <TextField label="Last Name" value={editingClient.lastname} onChange={(e) => setEditingClient({ ...editingClient, lastname: e.target.value })} {...textFieldProps} />
-            <TextField label="Email" value={editingClient.email} onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })} {...textFieldProps} />
-            <TextField label="Phone" value={editingClient.phone} onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })} {...textFieldProps} />
+        <Dialog
+          open={Boolean(editingClient)}
+          onClose={() => {
+            setEditingClient(null);
+            setDialogError(null);
+          }}
+          fullWidth
+          maxWidth="sm"
+          slotProps={{
+            paper: {
+              sx: {
+                backgroundColor: "#fff",
+                color: "#111827",
+                opacity: 1,
+                boxShadow: 24,
+              },
+            },
+          }}
+        >
+          <DialogTitle>Edit Client</DialogTitle>
+          <DialogContent>
+            {dialogError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {dialogError}
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
+              <TextField label="First Name" value={editingClient.firstname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, firstname: e.target.value }); }} {...dialogTextFieldProps} />
+              <TextField label="Last Name" value={editingClient.lastname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, lastname: e.target.value }); }} {...dialogTextFieldProps} />
+              <TextField label="Email" value={editingClient.email} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, email: e.target.value }); }} helperText="Expected format: name@example.com" {...dialogTextFieldProps} />
+              <TextField
+                label="Phone"
+                value={formatPhoneForEdit(editingClient.phone)}
+                onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, phone: normalizePhone(e.target.value) }); }}
+                {...dialogTextFieldProps}
+              />
+              <TextField
+                label="Birthdate"
+                type="date"
+                value={formatBirthdateForEdit(editingClient.birthdate)}
+                onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, birthdate: e.target.value }); }}
+                required
+                {...dialogDateFieldProps}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => { setEditingClient(null); setDialogError(null); }}>Cancel</Button>
             <Button variant="contained" onClick={handleUpdate}>Save</Button>
-          </Box>
-        </Box>
+          </DialogActions>
+        </Dialog>
       )}
       <Snackbar
         open={toast.open}
@@ -361,7 +746,22 @@ export default function ClientsPage() {
         </Alert>
       </Snackbar>
       {/* Import errors dialog */}
-      <Dialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: "#fff",
+              color: "#111827",
+              opacity: 1,
+              boxShadow: 24,
+            },
+          },
+        }}
+      >
         <DialogTitle>Import Errors</DialogTitle>
         <DialogContent>
           <Typography sx={{ mb: 1 }}>Some rows failed to import:</Typography>
@@ -374,6 +774,48 @@ export default function ClientsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setImportDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={addDialogOpen}
+        onClose={() => { setAddDialogOpen(false); setDialogError(null); }}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: "#fff",
+              color: "#111827",
+              opacity: 1,
+              boxShadow: 24,
+            },
+          },
+        }}
+      >
+        <DialogTitle>Add Client</DialogTitle>
+        <DialogContent>
+          {dialogError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {dialogError}
+            </Alert>
+          )}
+          <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
+            <TextField label="First Name" value={newClient.firstname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, firstname: e.target.value }); }} {...dialogTextFieldProps} />
+            <TextField label="Last Name" value={newClient.lastname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, lastname: e.target.value }); }} {...dialogTextFieldProps} />
+            <TextField label="Email" value={newClient.email} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, email: e.target.value }); }} helperText="Expected format: name@example.com" {...dialogTextFieldProps} />
+            <TextField
+              label="Phone"
+              value={formatPhoneForEdit(newClient.phone)}
+              onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, phone: normalizePhone(e.target.value) }); }}
+              {...dialogTextFieldProps}
+            />
+            <TextField label="Birthdate" type="date" value={newClient.birthdate} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, birthdate: e.target.value }); }} required {...dialogDateFieldProps} />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setAddDialogOpen(false); setDialogError(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleAdd}>Add</Button>
         </DialogActions>
       </Dialog>
     </Box>

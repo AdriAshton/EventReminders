@@ -18,9 +18,8 @@ export default function AuthSessionManager() {
       return;
     }
 
-    ensureValidSession();
-
     const validate = () => ensureValidSession();
+    const initialTimer = window.setTimeout(validate, 1000);
     const intervalId = window.setInterval(validate, 30000);
 
     window.addEventListener("focus", validate);
@@ -28,6 +27,7 @@ export default function AuthSessionManager() {
     window.addEventListener("storage", validate);
 
     return () => {
+      window.clearTimeout(initialTimer);
       window.clearInterval(intervalId);
       window.removeEventListener("focus", validate);
       document.removeEventListener("visibilitychange", validate);

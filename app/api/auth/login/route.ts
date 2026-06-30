@@ -9,9 +9,10 @@ export async function POST(req: Request) {
   const loginEmail = String(email || '').trim();
 
   const result = await pool.query(
-    `SELECT u.*, r.rolename AS role
+    `SELECT u.userid, u.companyid, u.username, u.passwordhash, u.email, u.roleid, u.settings,
+            r.rolename AS role
      FROM users u
-     JOIN roles r ON r.roleid = u.roleid
+     INNER JOIN roles r ON r.roleid = u.roleid
      WHERE u.email = $1`,
     [loginEmail]
   );
@@ -19,6 +20,10 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (!user.roleid || !user.role) {
+    return NextResponse.json({ error: "A valid role is required to log in" }, { status: 403 });
   }
 
   // ✅ Compare submitted password with stored hash
@@ -58,12 +63,22 @@ export async function POST(req: Request) {
 
   // ✅ Issue JWT
   const token = jwt.sign(
-    { userid: user.userid, companyid: user.companyid, role: user.role, username: user.username },
+    { userid: user.userid, companyid: user.companyid, roleid: user.roleid, role: user.role, username: user.username },
     process.env.JWT_SECRET!,
     { expiresIn: "1h" }
   );
-  console.log("JWT_SECRET:", process.env.JWT_SECRET);
-  const response = NextResponse.json({ message: "Login successful", token });
+  const response = NextResponse.json({
+    message: "Login successful",
+    token,
+    user: {
+      userid: user.userid,
+      companyid: user.companyid,
+      username: user.username,
+      email: user.email,
+      roleid: user.roleid,
+      role: user.role,
+    },
+  });
   response.cookies.set("auth", token, {
     httpOnly: true,
     sameSite: "lax",

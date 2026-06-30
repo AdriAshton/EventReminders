@@ -17,14 +17,13 @@ function verifyToken(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
 
     if (id) {
       const result = await pool.query(
-        "SELECT * FROM messages WHERE messageid = $1 AND companyid = $2",
-        [Number(id), decoded.companyid]
+        "SELECT * FROM messages WHERE messageid = $1",
+        [Number(id)]
       );
       if (result.rows.length === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -37,13 +36,13 @@ export async function GET(req: Request) {
     const offset = (Math.max(page, 1) - 1) * pageSize;
 
     const dataResult = await pool.query(
-      "SELECT * FROM messages WHERE companyid = $1 ORDER BY messageid LIMIT $2 OFFSET $3",
-      [decoded.companyid, pageSize, offset]
+      "SELECT * FROM messages ORDER BY messageid LIMIT $1 OFFSET $2",
+      [pageSize, offset]
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*)::int AS total FROM messages WHERE companyid = $1",
-      [decoded.companyid]
+      "SELECT COUNT(*)::int AS total FROM messages",
+      []
     );
 
     return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
@@ -54,15 +53,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const {
       reminderId,
       channel,
       subject,
       messageBody,
-      attachmentUrl,
-      attachmentFileName,
-      attachmentMimeType,
       status,
       sentAt,
     } = await req.json();
@@ -79,19 +74,28 @@ export async function POST(req: Request) {
 
     const result = await pool.query(
       `INSERT INTO messages (
-        reminderid, companyid, channel, subject, messagebody,
+        reminderid, channel, subject, messagebody,
         attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT (reminderid) DO UPDATE SET
+        channel = EXCLUDED.channel,
+        subject = EXCLUDED.subject,
+        messagebody = EXCLUDED.messagebody,
+        attachmenturl = EXCLUDED.attachmenturl,
+        attachmentfilename = EXCLUDED.attachmentfilename,
+        attachmentmimetype = EXCLUDED.attachmentmimetype,
+        status = EXCLUDED.status,
+        sentat = EXCLUDED.sentat,
+        updatedat = NOW()
       RETURNING *`,
       [
         reminderId,
-        decoded.companyid,
         channel,
         subject || null,
         messageBody,
-        attachmentUrl || null,
-        attachmentFileName || null,
-        attachmentMimeType || null,
+        null,
+        null,
+        null,
         status || "Draft",
         sentAt || null,
       ]
@@ -105,16 +109,12 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const {
       messageid,
       reminderId,
       channel,
       subject,
       messageBody,
-      attachmentUrl,
-      attachmentFileName,
-      attachmentMimeType,
       status,
       sentAt,
     } = await req.json();
@@ -135,25 +135,24 @@ export async function PUT(req: Request) {
     await pool.query(
       `UPDATE messages SET
         reminderid = $1,
-        companyid = $2,
-        channel = $3,
-        subject = $4,
-        messagebody = $5,
-        attachmenturl = $6,
-        attachmentfilename = $7,
-        attachmentmimetype = $8,
-        status = $9,
-        sentat = $10
-      WHERE messageid = $11 AND companyid = $2`,
+        channel = $2,
+        subject = $3,
+        messagebody = $4,
+        attachmenturl = $5,
+        attachmentfilename = $6,
+        attachmentmimetype = $7,
+        status = $8,
+        sentat = $9,
+        updatedat = NOW()
+      WHERE messageid = $10`,
       [
         reminderId,
-        decoded.companyid,
         channel,
         subject || null,
         messageBody,
-        attachmentUrl || null,
-        attachmentFileName || null,
-        attachmentMimeType || null,
+        null,
+        null,
+        null,
         status || "Draft",
         sentAt || null,
         messageid,
@@ -168,7 +167,6 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const { messageid } = await req.json();
 
     if (!messageid) {
@@ -176,8 +174,8 @@ export async function DELETE(req: Request) {
     }
 
     const result = await pool.query(
-      "DELETE FROM messages WHERE messageid = $1 AND companyid = $2",
-      [messageid, decoded.companyid]
+      "DELETE FROM messages WHERE messageid = $1",
+      [messageid]
     );
 
     if (result.rowCount === 0) {

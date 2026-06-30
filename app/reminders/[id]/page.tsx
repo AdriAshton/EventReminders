@@ -63,7 +63,7 @@ export default function ReminderDetailPage() {
       <Button variant="outlined" onClick={() => router.push('/reminders')} sx={{ mb: 2 }}>Back</Button>
       <Typography variant="h4" gutterBottom>Reminder Details</Typography>
       <Paper sx={{ p: 2, maxWidth: 600 }}>
-        <Typography><strong>Event ID:</strong> {reminder.eventid}</Typography>
+        <Typography><strong>Client ID:</strong> {reminder.clientid}</Typography>
         <Typography><strong>Company ID:</strong> {reminder.companyid}</Typography>
         <Typography><strong>Time:</strong> {formatDate(reminder.reminderdatetime)}</Typography>
         <Typography><strong>Method:</strong> {reminder.remindermethod}</Typography>

@@ -31,11 +31,13 @@ export async function getReminder(reminderid: number) {
 
 // POST new reminder
 export async function addReminder(reminder: {
-  eventid: number;
+  clientid: number;
   companyid: number;
-  reminderdatetime: Date;   // ✅ now a Date object
+  reminderdatetime?: Date;
   remindermethod: string;   // e.g. "Email", "SMS"
   status?: string;          // optional, defaults to "Pending"
+  sendtime?: string;
+  isactive?: boolean;
 }) {
   const res = await authenticatedFetch("/api/reminders", {
     method: "POST",
@@ -54,11 +56,13 @@ export async function addReminder(reminder: {
 // PUT update reminder
 export async function updateReminder(reminder: {
   reminderid: number;
-  eventid: number;
+  clientid: number;
   companyid: number;
-  reminderdatetime: Date;   // ✅ now a Date object
+  reminderdatetime?: Date;
   remindermethod: string;
   status: string;
+  sendtime?: string;
+  isactive?: boolean;
 }) {
   const res = await authenticatedFetch("/api/reminders", {
     method: "PUT",

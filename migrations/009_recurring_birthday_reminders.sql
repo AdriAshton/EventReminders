@@ -1,5 +1,5 @@
 -- Migration: 009_recurring_birthday_reminders.sql
--- Add yearly recurrence support for birthday reminders
+-- Add yearly run scheduling support for birthday reminders
 
 BEGIN;
 

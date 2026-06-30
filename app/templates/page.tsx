@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -19,18 +19,19 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { createTemplateId, renderTemplate } from "@/lib/messageTemplates";
+import { uploadMessageImage } from "@/services/messageService";
 
 type TemplateState = {
   id: string;
   name: string;
   subject: string;
   body: string;
+  imageUrl?: string;
 };
 
 const sampleValues = {
   clientName: "Adrian",
   companyName: "Birthday Reminders Ltd",
-  senderName: "Customer Care Team",
   eventDate: "14 June 2026",
 };
 
@@ -39,6 +40,7 @@ const emptyTemplate: TemplateState = {
   name: "",
   subject: "",
   body: "",
+  imageUrl: "",
 };
 
 export default function TemplatesPage() {
@@ -54,6 +56,9 @@ export default function TemplatesPage() {
     message: "",
     severity: "success",
   });
+  const subjectRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const bodyRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const [activeField, setActiveField] = useState<"subject" | "body">("body");
 
   useEffect(() => {
     loadTemplates();
@@ -88,15 +93,55 @@ export default function TemplatesPage() {
     setError(null);
   }
 
+  function insertTemplateToken(token: string) {
+    const targetRef = activeField === "subject" ? subjectRef : bodyRef;
+    const target = targetRef.current;
+
+    if (!target) {
+      return;
+    }
+
+    const start = target.selectionStart ?? editor[activeField].length;
+    const end = target.selectionEnd ?? editor[activeField].length;
+    const currentValue = editor[activeField] || "";
+    const nextValue = `${currentValue.slice(0, start)}${token}${currentValue.slice(end)}`;
+
+    setEditor((current) => ({
+      ...current,
+      [activeField]: nextValue,
+    }));
+
+    requestAnimationFrame(() => {
+      const nextCursor = start + token.length;
+      target.focus();
+      target.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
   function handleCreate() {
     const newTemplate: TemplateState = {
       id: createTemplateId(`template-${templates.length + 1}`),
       name: `Template ${templates.length + 1}`,
       subject: "Happy Birthday, {{clientName}}!",
-      body: "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}",
+      body: "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,",
+      imageUrl: "",
     };
     setEditor(newTemplate);
     setError(null);
+  }
+
+  async function handleTemplateImageUpload(file: File) {
+    const result = await uploadMessageImage(file);
+    if ((result as any).error) {
+      setToast({ open: true, message: (result as any).error, severity: "error" });
+      return;
+    }
+
+    setEditor((current) => ({
+      ...current,
+      imageUrl: (result as any).url || "",
+    }));
+    setToast({ open: true, message: "Template image uploaded", severity: "success" });
   }
 
   async function handleSave() {
@@ -206,9 +251,13 @@ export default function TemplatesPage() {
           <Typography variant="body2" color="text.secondary">
             Manage multiple birthday templates and choose the global default.
           </Typography>
+        
         </Box>
-        <Button variant="outlined" onClick={() => router.push("/settings")}>Back to Settings</Button>
       </Stack>
+
+   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+     <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+   </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -234,6 +283,10 @@ export default function TemplatesPage() {
                   onClick={() => selectTemplate(template)}
                 >
                   <ListItemText
+                    slotProps={{
+                      primary: { component: 'div' },
+                      secondary: { component: 'div' },
+                    }}
                     primary={template.name}
                     secondary={template.id === activeTemplateId ? "Default template" : template.id}
                   />
@@ -259,24 +312,53 @@ export default function TemplatesPage() {
                 label="Email subject"
                 value={editor.subject}
                 onChange={(e) => setEditor((current) => ({ ...current, subject: e.target.value }))}
+                onFocus={() => setActiveField("subject")}
                 disabled={loading || saving}
                 fullWidth
+                inputRef={subjectRef}
               />
               <TextField
                 label="Message body"
                 value={editor.body}
                 onChange={(e) => setEditor((current) => ({ ...current, body: e.target.value }))}
+                onFocus={() => setActiveField("body")}
                 disabled={loading || saving}
                 fullWidth
                 multiline
                 minRows={10}
+                inputRef={bodyRef}
               />
 
+              <Box sx={{ display: "grid", gap: 1 }}>
+                <Button component="label" variant="outlined" disabled={loading || saving}>
+                  Upload Template Image
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        void handleTemplateImageUpload(file);
+                      }
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </Button>
+                {editor.imageUrl && (
+                  <Box
+                    component="img"
+                    src={editor.imageUrl}
+                    alt="Template preview"
+                    sx={{ width: "100%", maxWidth: 320, borderRadius: 2, border: "1px solid rgba(0,0,0,0.12)" }}
+                  />
+                )}
+              </Box>
+
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-                <Chip label="{{clientName}}" size="small" />
-                <Chip label="{{companyName}}" size="small" />
-                <Chip label="{{senderName}}" size="small" />
-                <Chip label="{{eventDate}}" size="small" />
+                <Chip label="{{clientName}}" size="small" onDoubleClick={() => insertTemplateToken("{{clientName}}")} />
+                <Chip label="{{companyName}}" size="small" onDoubleClick={() => insertTemplateToken("{{companyName}}")} />
+                <Chip label="{{eventDate}}" size="small" onDoubleClick={() => insertTemplateToken("{{eventDate}}")} />
               </Stack>
 
               <Stack direction="row" spacing={2}>
@@ -321,6 +403,18 @@ export default function TemplatesPage() {
             >
               {preview.body}
             </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Image</Typography>
+            {editor.imageUrl ? (
+              <Box
+                component="img"
+                src={editor.imageUrl}
+                alt="Template image preview"
+                sx={{ width: "100%", maxWidth: 320, borderRadius: 2, border: "1px solid rgba(0,0,0,0.08)" }}
+              />
+            ) : (
+              <Typography variant="body2">No template image uploaded yet.</Typography>
+            )}
           </CardContent>
         </Card>
       </Stack>

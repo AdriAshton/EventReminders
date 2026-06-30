@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Box, Button, Typography, Paper } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Typography } from "@mui/material";
 import { useRouter, useParams } from "next/navigation";
 import { getClient } from "@/services/clientService";
 
@@ -51,36 +51,7 @@ export default function ClientDetailPage() {
     load();
   }, [id]);
 
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={() => router.push('/clients')} sx={{ mb: 2 }}>Back</Button>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={() => router.push("/clients")} sx={{ mb: 2 }}>
-          Back
-        </Button>
-        <Typography>Loading...</Typography>
-      </Box>
-    );
-  }
-
-  if (!client) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Button variant="outlined" onClick={() => router.push("/clients")} sx={{ mb: 2 }}>
-          Back
-        </Button>
-        <Typography color="error">{error || "Client not found"}</Typography>
-      </Box>
-    );
-  }
+  const dialogOpen = Boolean(error);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -93,13 +64,33 @@ export default function ClientDetailPage() {
       </Typography>
 
       <Paper sx={{ p: 2, maxWidth: 600 }}>
-        <Typography><strong>First Name:</strong> {client.firstname}</Typography>
-        <Typography><strong>Last Name:</strong> {client.lastname}</Typography>
-        <Typography><strong>Email:</strong> {maskEmail(client.email)}</Typography>
-        <Typography><strong>Phone:</strong> {maskPhone(client.phone)}</Typography>
-        <Typography><strong>Client ID:</strong> {client.clientid}</Typography>
+        {loading ? (
+          <Typography>Loading...</Typography>
+        ) : client ? (
+          <>
+            <Typography><strong>First Name:</strong> {client.firstname}</Typography>
+            <Typography><strong>Last Name:</strong> {client.lastname}</Typography>
+            <Typography><strong>Email:</strong> {maskEmail(client.email)}</Typography>
+            <Typography><strong>Phone:</strong> {maskPhone(client.phone)}</Typography>
+            <Typography><strong>Client ID:</strong> {client.clientid}</Typography>
+          </>
+        ) : (
+          <Typography>No client data available.</Typography>
+        )}
         {/* Edit button removed as requested */}
       </Paper>
+
+      <Dialog open={dialogOpen} onClose={() => router.push('/clients')} fullWidth maxWidth="sm">
+        <DialogTitle>Unable to load client</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {error || "Client not found"}
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => router.push('/clients')}>Back</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

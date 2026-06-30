@@ -15,7 +15,7 @@ function verifyToken(req: Request) {
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const result = await pool.query(`SELECT settings FROM users WHERE userid = $1 AND companyid = $2`, [decoded.userid, decoded.companyid]);
+    const result = await pool.query(`SELECT settings FROM users WHERE userid = $1`, [decoded.userid]);
     const settings = result.rows[0]?.settings || {};
     return NextResponse.json(settings);
   } catch (err: any) {
@@ -28,10 +28,10 @@ export async function PUT(req: Request) {
     const decoded = verifyToken(req);
     const body = await req.json();
     // merge existing settings with provided
-    const current = await pool.query(`SELECT settings FROM users WHERE userid = $1 AND companyid = $2`, [decoded.userid, decoded.companyid]);
+    const current = await pool.query(`SELECT settings FROM users WHERE userid = $1`, [decoded.userid]);
     const existing = current.rows[0]?.settings || {};
     const merged = { ...existing, ...body };
-    await pool.query(`UPDATE users SET settings = $1, updatedat = NOW() WHERE userid = $2 AND companyid = $3`, [merged, decoded.userid, decoded.companyid]);
+    await pool.query(`UPDATE users SET settings = $1, updatedat = NOW() WHERE userid = $2`, [merged, decoded.userid]);
     return NextResponse.json(merged);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 401 });

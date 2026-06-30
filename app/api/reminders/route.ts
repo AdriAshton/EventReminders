@@ -18,25 +18,63 @@ function envValue(name: string) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
-async function getReminderRecipient(companyid: number, eventid: number) {
+async function getDefaultCompany() {
   const result = await pool.query(
-    `SELECT c.email, c.firstname, c.lastname, e.eventdate, e.notes, et.eventtypename
-     FROM events e
-     JOIN clients c ON c.clientid = e.clientid
-     LEFT JOIN eventtypes et ON et.eventtypeid = e.eventtypeid
-     WHERE e.eventid = $1 AND e.companyid = $2`,
-    [eventid, companyid]
+    `SELECT companyname, contactemail, contactphone
+     FROM companies
+     ORDER BY companyid ASC
+     LIMIT 1`
   );
 
   return result.rows[0] || null;
 }
 
-async function sendTwilioMessage(to: string, body: string, useWhatsApp: boolean) {
+function getNextBirthdayRunAt(birthdate: string | null | undefined, sendTime: string | null | undefined) {
+  if (!birthdate) return null;
+
+  const birth = new Date(birthdate);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const now = new Date();
+  const month = birth.getMonth();
+  const day = birth.getDate();
+  const [hours, minutes, seconds] = String(sendTime || '09:00:00').split(':').map((part) => Number(part || 0));
+
+  const candidate = new Date(now.getFullYear(), month, day, hours, minutes, seconds || 0, 0);
+  if (candidate < now) {
+    candidate.setFullYear(candidate.getFullYear() + 1);
+  }
+
+  return candidate;
+}
+
+async function getReminderRecipient(clientid: number) {
+  const result = await pool.query(
+    `SELECT c.email, c.firstname, c.lastname, c.phone, c.birthdate, c.companyid
+     FROM clients c
+     WHERE c.clientid = $1`,
+    [clientid]
+  );
+
+  return result.rows[0] || null;
+}
+
+function normalizeReminderRow(row: { birthdate?: string | null; sendtime?: string | null; nextrunat?: string | Date | null; [key: string]: any }) {
+  if (row?.nextrunat) return row;
+
+  const nextRunAt = getNextBirthdayRunAt(row.birthdate, row.sendtime);
+  return {
+    ...row,
+    nextrunat: nextRunAt ? nextRunAt.toISOString() : row.nextrunat,
+  };
+}
+
+async function sendTwilioMessage(to: string, body: string, useWhatsApp: boolean, fromNumber?: string) {
   const accountSid = envValue('TWILIO_ACCOUNT_SID');
   const authToken = envValue('TWILIO_AUTH_TOKEN');
-  const fromNumber = envValue('TWILIO_FROM_NUMBER');
+  const senderNumber = fromNumber || envValue('TWILIO_FROM_NUMBER');
 
-  if (!accountSid || !authToken || !fromNumber) {
+  if (!accountSid || !authToken || !senderNumber) {
     console.log('Twilio credentials are not configured. Skipping message send.', {
       provider: useWhatsApp ? 'whatsapp' : 'sms',
       to,
@@ -45,7 +83,7 @@ async function sendTwilioMessage(to: string, body: string, useWhatsApp: boolean)
     return;
   }
 
-  const from = useWhatsApp ? `whatsapp:${fromNumber}` : fromNumber;
+  const from = useWhatsApp ? `whatsapp:${senderNumber}` : senderNumber;
   const recipient = useWhatsApp ? `whatsapp:${to}` : to;
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
     method: 'POST',
@@ -66,28 +104,27 @@ async function sendTwilioMessage(to: string, body: string, useWhatsApp: boolean)
   }
 }
 
-async function sendReminderEmail(companyid: number, eventid: number, reminderdatetime: string, status?: string) {
-  const recipient = await getReminderRecipient(companyid, eventid);
+async function sendReminderEmail(clientid: number, reminderdatetime: string, status?: string) {
+  const recipient = await getReminderRecipient(clientid);
+  const company = await getDefaultCompany();
 
   if (!recipient?.email) {
-    console.log('Reminder email skipped: no client email found for event', { companyid, eventid });
+    console.log('Reminder email skipped: no client email found for birthday reminder', { clientid });
     return;
   }
 
   const clientName = [recipient.firstname, recipient.lastname].filter(Boolean).join(' ') || 'Client';
-  const subject = `Reminder for ${recipient.eventtypename || 'your event'}`;
+  const subject = `Birthday reminder for ${clientName}`;
   const text = [
     `Hello ${clientName},`,
     '',
-    `This is a reminder for your event on ${recipient.eventdate}.`,
-    recipient.notes ? `Notes: ${recipient.notes}` : null,
+    `This is a reminder for your birthday on ${recipient.birthdate}.`,
     `Scheduled reminder time: ${reminderdatetime}`,
     status ? `Status: ${status}` : null,
   ].filter(Boolean).join('\n');
   const html = `
     <p>Hello ${clientName},</p>
-    <p>This is a reminder for your event on <strong>${recipient.eventdate}</strong>.</p>
-    ${recipient.notes ? `<p><strong>Notes:</strong> ${recipient.notes}</p>` : ''}
+    <p>This is a reminder for your birthday on <strong>${recipient.birthdate}</strong>.</p>
     <p><strong>Scheduled reminder time:</strong> ${reminderdatetime}</p>
     ${status ? `<p><strong>Status:</strong> ${status}</p>` : ''}
   `;
@@ -97,42 +134,45 @@ async function sendReminderEmail(companyid: number, eventid: number, reminderdat
     subject,
     text,
     html,
+    from: company?.contactemail || undefined,
   });
 }
 
-async function sendReminderSmsOrWhatsApp(companyid: number, eventid: number, reminderdatetime: string, status: string | undefined, useWhatsApp: boolean) {
-  const recipient = await getReminderRecipient(companyid, eventid);
+async function sendReminderSmsOrWhatsApp(clientid: number, reminderdatetime: string, status: string | undefined, useWhatsApp: boolean) {
+  const recipient = await getReminderRecipient(clientid);
+  const company = await getDefaultCompany();
 
   if (!recipient?.phone) {
-    console.log('Reminder message skipped: no client phone found for event', { companyid, eventid });
+    console.log('Reminder message skipped: no client phone found for birthday reminder', { clientid });
     return;
   }
 
   const clientName = [recipient.firstname, recipient.lastname].filter(Boolean).join(' ') || 'Client';
   const message = [
     `Hello ${clientName},`,
-    `This is a reminder for your event on ${recipient.eventdate}.`,
-    recipient.notes ? `Notes: ${recipient.notes}` : null,
+    `This is a reminder for your birthday on ${recipient.birthdate}.`,
     `Scheduled reminder time: ${reminderdatetime}`,
     status ? `Status: ${status}` : null,
   ].filter(Boolean).join(' ');
 
-  await sendTwilioMessage(recipient.phone, message, useWhatsApp);
+  const senderNumber = company?.contactphone || undefined;
+  await sendTwilioMessage(recipient.phone, message, useWhatsApp, senderNumber);
 }
 
-// GET all reminders (scoped by companyid)
 export async function GET(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (id) {
       const result = await pool.query(
-        'SELECT * FROM reminders WHERE reminderid = $1 AND companyid = $2',
-        [Number(id), decoded.companyid]
+        `SELECT r.*, c.firstname, c.lastname, c.birthdate, c.email
+         FROM reminders r
+         JOIN clients c ON c.clientid = r.clientid
+         WHERE r.reminderid = $1`,
+        [Number(id)]
       );
       if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-      return NextResponse.json(result.rows[0]);
+      return NextResponse.json(normalizeReminderRow(result.rows[0]));
     }
 
     // support pagination: ?page=1&pageSize=10
@@ -141,16 +181,23 @@ export async function GET(req: Request) {
     const offset = (Math.max(page, 1) - 1) * pageSize;
 
     const dataResult = await pool.query(
-      'SELECT * FROM reminders WHERE companyid = $1 ORDER BY reminderid LIMIT $2 OFFSET $3',
-      [decoded.companyid, pageSize, offset]
+      `SELECT r.*, c.firstname, c.lastname, c.birthdate, c.email
+       FROM reminders r
+       JOIN clients c ON c.clientid = r.clientid
+       ORDER BY r.reminderid
+       LIMIT $1 OFFSET $2`,
+      [pageSize, offset]
     );
 
     const countResult = await pool.query(
-      'SELECT COUNT(*)::int as total FROM reminders WHERE companyid = $1',
-      [decoded.companyid]
+      'SELECT COUNT(*)::int as total FROM reminders',
+      []
     );
 
-    return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
+    return NextResponse.json({
+      rows: dataResult.rows.map((row) => normalizeReminderRow(row)),
+      total: countResult.rows[0].total,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 401 });
   }
@@ -159,62 +206,53 @@ export async function GET(req: Request) {
 // POST new reminder
 export async function POST(req: Request) {
   try {
-    const decoded = verifyToken(req);
-    const { eventid, reminderdatetime, remindermethod, status, timingtype, timingvalue, timingunit, sendtime, isactive } = await req.json();
+    const { clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
+    const recipient = await getReminderRecipient(Number(clientid));
+    const scheduledAt = getNextBirthdayRunAt(recipient?.birthdate, sendtime) || (reminderdatetime ? new Date(reminderdatetime) : null);
 
     if (method.toLowerCase() === 'whatsapp') {
       console.log('WhatsApp reminder payload:', {
-        companyid: decoded.companyid,
-        eventid,
-        reminderdatetime,
+        clientid,
+        reminderdatetime: scheduledAt ?? reminderdatetime,
         remindermethod: method,
         status,
-        timingtype,
-        timingvalue,
-        timingunit,
         sendtime,
         isactive,
       });
     }
 
     if (method.toLowerCase() === 'email') {
-      await sendReminderEmail(decoded.companyid, Number(eventid), reminderdatetime, status);
+      await sendReminderEmail(Number(clientid), scheduledAt ? scheduledAt.toString() : reminderdatetime, status);
     }
 
     // Validate datetime
-    if (!reminderdatetime || isNaN(Date.parse(reminderdatetime))) {
+    if (!scheduledAt || isNaN(scheduledAt.getTime())) {
       return NextResponse.json({ error: "Invalid reminder date/time" }, { status: 400 });
     }
 
     // Validate method
-    const allowedMethods = ["email", "sms", "whatsapp"];
+    const allowedMethods = ["email", "whatsapp"];
     if (!allowedMethods.includes(method.toLowerCase())) {
       return NextResponse.json({ error: "Invalid reminder method" }, { status: 400 });
     }
 
-    if (method.toLowerCase() === 'sms') {
-      await sendReminderSmsOrWhatsApp(decoded.companyid, Number(eventid), reminderdatetime, status, false);
-    }
-
     if (method.toLowerCase() === 'whatsapp') {
-      await sendReminderSmsOrWhatsApp(decoded.companyid, Number(eventid), reminderdatetime, status, true);
+      await sendReminderSmsOrWhatsApp(Number(clientid), scheduledAt.toString(), status, true);
     }
 
     await pool.query(
-      `INSERT INTO reminders (eventid, companyid, reminderdatetime, remindermethod, status, timingtype, timingvalue, timingunit, sendtime, isactive) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO reminders (clientid, companyid, reminderdatetime, remindermethod, status, sendtime, isactive, nextrunat) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
-        eventid,
-        decoded.companyid,
-        reminderdatetime,
+        clientid,
+        recipient?.companyid || 1,
+        scheduledAt,
         method,
         status || "Pending",
-        timingtype || "Before",
-        timingvalue ?? 1,
-        timingunit || "Days",
         sendtime || "09:00:00",
         isactive ?? true,
+        scheduledAt,
       ]
     );
 
@@ -227,64 +265,61 @@ export async function POST(req: Request) {
 // PUT update reminder
 export async function PUT(req: Request) {
   try {
-    const decoded = verifyToken(req);
-    const { reminderid, eventid, reminderdatetime, remindermethod, status, timingtype, timingvalue, timingunit, sendtime, isactive } = await req.json();
+    const { reminderid, clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
+    const recipient = await getReminderRecipient(Number(clientid));
+    const scheduledAt = getNextBirthdayRunAt(recipient?.birthdate, sendtime) || (reminderdatetime ? new Date(reminderdatetime) : null);
 
     if (method.toLowerCase() === 'whatsapp') {
       console.log('WhatsApp reminder payload:', {
-        companyid: decoded.companyid,
         reminderid,
-        eventid,
-        reminderdatetime,
+        clientid,
+        reminderdatetime: scheduledAt ?? reminderdatetime,
         remindermethod: method,
         status,
-        timingtype,
-        timingvalue,
-        timingunit,
         sendtime,
         isactive,
       });
     }
 
     if (method.toLowerCase() === 'email') {
-      await sendReminderEmail(decoded.companyid, Number(eventid), reminderdatetime, status);
+      await sendReminderEmail(Number(clientid), scheduledAt ? scheduledAt.toString() : reminderdatetime, status);
     }
 
-    if (!reminderdatetime || isNaN(Date.parse(reminderdatetime))) {
+    if (!scheduledAt || isNaN(scheduledAt.getTime())) {
       return NextResponse.json({ error: "Invalid reminder date/time" }, { status: 400 });
     }
 
-    const allowedMethods = ["email", "sms", "whatsapp"];
+    const allowedMethods = ["email", "whatsapp"];
     if (!allowedMethods.includes(method.toLowerCase())) {
       return NextResponse.json({ error: "Invalid reminder method" }, { status: 400 });
     }
 
-    if (method.toLowerCase() === 'sms') {
-      await sendReminderSmsOrWhatsApp(decoded.companyid, Number(eventid), reminderdatetime, status, false);
-    }
-
     if (method.toLowerCase() === 'whatsapp') {
-      await sendReminderSmsOrWhatsApp(decoded.companyid, Number(eventid), reminderdatetime, status, true);
+      await sendReminderSmsOrWhatsApp(Number(clientid), scheduledAt.toString(), status, true);
     }
 
     await pool.query(
       `UPDATE reminders 
-       SET eventid = $1, companyid = $2, reminderdatetime = $3, remindermethod = $4, status = $5, timingtype = $6, timingvalue = $7, timingunit = $8, sendtime = $9, isactive = $10
-       WHERE reminderid = $6 AND companyid = $2`,
+       SET clientid = $1, reminderdatetime = $2, remindermethod = $3, status = $4, sendtime = $5, isactive = $6, nextrunat = $7
+       WHERE reminderid = $8`,
       [
-        eventid,
-        decoded.companyid,
-        reminderdatetime,
+        clientid,
+        scheduledAt,
         method,
         status,
-        timingtype || "Before",
-        timingvalue ?? 1,
-        timingunit || "Days",
         sendtime || "09:00:00",
         isactive ?? true,
+        scheduledAt,
         reminderid,
       ]
+    );
+
+    await pool.query(
+      `UPDATE messages
+       SET channel = $1
+       WHERE reminderid = $2`,
+      [method === 'whatsapp' ? 'WhatsApp' : 'Email', reminderid]
     );
 
     return NextResponse.json({ message: "Reminder updated successfully" });
@@ -296,13 +331,12 @@ export async function PUT(req: Request) {
 // DELETE reminder
 export async function DELETE(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const body = await req.json();
     // support bulk delete: { ids: [1,2,3] } or single { reminderid }
     if (Array.isArray(body.ids) && body.ids.length > 0) {
       await pool.query(
-        'DELETE FROM reminders WHERE reminderid = ANY($1::int[]) AND companyid = $2',
-        [body.ids, decoded.companyid]
+        'DELETE FROM reminders WHERE reminderid = ANY($1::int[])',
+        [body.ids]
       );
       return NextResponse.json({ message: 'Reminders deleted successfully', deleted: body.ids.length });
     }
@@ -311,8 +345,8 @@ export async function DELETE(req: Request) {
     if (!reminderid) return NextResponse.json({ error: 'reminderid is required' }, { status: 400 });
 
     await pool.query(
-      'DELETE FROM reminders WHERE reminderid = $1 AND companyid = $2',
-      [reminderid, decoded.companyid]
+      'DELETE FROM reminders WHERE reminderid = $1',
+      [reminderid]
     );
 
     return NextResponse.json({ message: 'Reminder deleted successfully' });

@@ -17,7 +17,6 @@ export async function addUser(user: {
   password: string;
   roleid: number;
   email: string;
-  companyId: number;
 }) {
   const res = await authenticatedFetch("/api/users", {
     method: "POST",
@@ -40,7 +39,6 @@ export async function updateUser(user: {
   password?: string;
   roleid: number;
   email: string;
-  companyId: number;
 }) {
   const res = await authenticatedFetch("/api/users", {
     method: "PUT",

@@ -4,6 +4,6 @@
 INSERT INTO Roles (RoleName, Description)
 VALUES
     ('Administrator', 'Full access including setup/security and role management'),
-    ('Staff', 'Can add clients, events, and edit day-to-day data but not setup/security')
+    ('Staff', 'Can add clients and edit day-to-day data but not setup/security')
 ON CONFLICT (RoleName) DO UPDATE
 SET Description = EXCLUDED.Description;

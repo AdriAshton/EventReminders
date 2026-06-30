@@ -16,12 +16,11 @@ function verifyToken(req: Request) {
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
+    const role = String(decoded.role || "").toLowerCase();
 
-    // If you want to restrict to only the logged-in company:
-    const result = await pool.query(
-      "SELECT * FROM companies WHERE companyid = $1",
-      [decoded.companyid]
-    );
+    const result = role === "administrator"
+      ? await pool.query("SELECT * FROM companies ORDER BY companyid DESC")
+      : await pool.query("SELECT * FROM companies ORDER BY companyid DESC");
 
     return NextResponse.json(result.rows);
   } catch (err: any) {
@@ -34,27 +33,40 @@ export async function POST(req: Request) {
   try {
     verifyToken(req); // only admins should be allowed ideally
     const { companyname, contactemail, contactphone } = await req.json();
+    const normalizedCompanyName = typeof companyname === "string" ? companyname.trim() : "";
+    const normalizedContactEmail = typeof contactemail === "string" ? contactemail.trim() : "";
+    const normalizedContactPhone = typeof contactphone === "string" ? contactphone.trim() : "";
 
     // Validation
-    if (!companyname) {
+    if (!normalizedCompanyName) {
       return NextResponse.json({ error: "Company name is required" }, { status: 400 });
     }
-    if (contactemail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactemail)) {
+    if (!normalizedContactEmail) {
+      return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
+    }
+    if (!normalizedContactPhone) {
+      return NextResponse.json({ error: "Contact phone is required" }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContactEmail)) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
     }
-    if (contactphone && !/^\d{7,15}$/.test(contactphone)) {
+    if (!/^\d{7,15}$/.test(normalizedContactPhone)) {
       return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
     }
 
     const result = await pool.query(
       `INSERT INTO companies (companyname, contactemail, contactphone)
        VALUES ($1, $2, $3) RETURNING *`,
-      [companyname, contactemail, contactphone]
+      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone]
     );
 
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err?.message === "Unauthorized") {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+
+    return NextResponse.json({ error: err?.message || "Failed to create company" }, { status: 500 });
   }
 }
 
@@ -63,14 +75,23 @@ export async function PUT(req: Request) {
   try {
     verifyToken(req);
     const { companyid, companyname, contactemail, contactphone } = await req.json();
+    const normalizedCompanyName = typeof companyname === "string" ? companyname.trim() : "";
+    const normalizedContactEmail = typeof contactemail === "string" ? contactemail.trim() : "";
+    const normalizedContactPhone = typeof contactphone === "string" ? contactphone.trim() : "";
 
-    if (!companyname) {
+    if (!normalizedCompanyName) {
       return NextResponse.json({ error: "Company name is required" }, { status: 400 });
     }
-    if (contactemail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactemail)) {
+    if (!normalizedContactEmail) {
+      return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
+    }
+    if (!normalizedContactPhone) {
+      return NextResponse.json({ error: "Contact phone is required" }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContactEmail)) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
     }
-    if (contactphone && !/^\d{7,15}$/.test(contactphone)) {
+    if (!/^\d{7,15}$/.test(normalizedContactPhone)) {
       return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
     }
 
@@ -78,12 +99,16 @@ export async function PUT(req: Request) {
       `UPDATE companies
        SET companyname = $1, contactemail = $2, contactphone = $3, updatedat = NOW()
        WHERE companyid = $4`,
-      [companyname, contactemail, contactphone, companyid]
+      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone, companyid]
     );
 
     return NextResponse.json({ message: "Company updated successfully" });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err?.message === "Unauthorized") {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+
+    return NextResponse.json({ error: err?.message || "Failed to update company" }, { status: 500 });
   }
 }
 
@@ -97,6 +122,10 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: "Company deleted successfully" });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err?.message === "Unauthorized") {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+
+    return NextResponse.json({ error: err?.message || "Failed to delete company" }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ export type MessageTemplate = {
   name: string;
   subject: string;
   body: string;
+  imageUrl?: string;
 };
 
 export async function getMessages(page = 1, pageSize = 10) {
@@ -35,13 +36,9 @@ export async function getMessage(messageid: number) {
 
 export async function addMessage(message: {
   reminderId: number;
-  companyId: number;
   channel: string;
   subject: string;
   messageBody: string;
-  attachmentUrl: string;
-  attachmentFileName: string;
-  attachmentMimeType: string;
   status: string;
   sentAt: string | null;
 }) {
@@ -62,13 +59,9 @@ export async function addMessage(message: {
 export async function updateMessage(message: {
   messageid: number;
   reminderId: number;
-  companyId: number;
   channel: string;
   subject: string;
   messageBody: string;
-  attachmentUrl: string;
-  attachmentFileName: string;
-  attachmentMimeType: string;
   status: string;
   sentAt: string | null;
 }) {

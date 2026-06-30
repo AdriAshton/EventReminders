@@ -9,6 +9,7 @@ type EmailPayload = {
   subject: string;
   text: string;
   html?: string;
+  from?: string;
 };
 
 function envValue(name: string) {
@@ -40,14 +41,14 @@ async function sendBySendGrid(payload: EmailPayload) {
   sendgrid.setApiKey(envValue('SENDGRID_API_KEY') || '');
   return sendgrid.send({
     ...payload,
-    from: envValue('EMAIL_FROM') || 'no-reply@example.com',
+    from: payload.from || envValue('EMAIL_FROM') || 'no-reply@example.com',
   });
 }
 
 async function sendByTransport(payload: EmailPayload, transport: MailTransport) {
   return transport.sendMail({
     ...payload,
-    from: envValue('EMAIL_FROM') || envValue('GMAIL_USER') || 'no-reply@example.com',
+    from: payload.from || envValue('EMAIL_FROM') || envValue('GMAIL_USER') || 'no-reply@example.com',
   });
 }
 

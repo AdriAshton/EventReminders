@@ -33,6 +33,7 @@ export async function PUT(req: Request) {
           name: body?.name || 'Untitled Template',
           subject: body?.subject || '',
           body: body?.body || '',
+          imageUrl: body?.imageUrl || '',
         });
 
     if (body?.setActive !== false) {

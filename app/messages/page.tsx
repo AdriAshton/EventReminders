@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -33,18 +33,16 @@ import {
   getMessageTemplates,
   getMessages,
   renderMessageTemplate,
-  uploadMessageImage,
   updateMessage,
   type MessageTemplate,
 } from "@/services/messageService";
 
 export default function MessagesPage() {
   const router = useRouter();
-  const newPictureInputRef = useRef<HTMLInputElement | null>(null);
-  const editPictureInputRef = useRef<HTMLInputElement | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [activeTemplateImage, setActiveTemplateImage] = useState("");
   const [templatePreview, setTemplatePreview] = useState<{ subject: string; body: string; values: Record<string, string> } | null>(null);
   const [renderingTemplate, setRenderingTemplate] = useState(false);
   const [pkFilter, setPkFilter] = useState<number | string>("");
@@ -54,13 +52,9 @@ export default function MessagesPage() {
   const [total, setTotal] = useState(0);
   const [newMessage, setNewMessage] = useState({
     reminderId: 1,
-    companyId: 1,
     channel: "Email",
     subject: "",
     messageBody: "",
-    attachmentUrl: "",
-    attachmentFileName: "",
-    attachmentMimeType: "",
     status: "Draft",
     sentAt: "",
   });
@@ -101,6 +95,7 @@ export default function MessagesPage() {
 
     setTemplates(data.templates || []);
     setSelectedTemplateId(data.activeTemplateId || data.template?.id || "");
+    setActiveTemplateImage(data.template?.imageUrl || "");
   }
 
   async function handlePreviewTemplate() {
@@ -142,13 +137,9 @@ export default function MessagesPage() {
       await loadMessages();
       setNewMessage({
         reminderId: 1,
-        companyId: 1,
         channel: "Email",
         subject: "",
         messageBody: "",
-        attachmentUrl: "",
-        attachmentFileName: "",
-        attachmentMimeType: "",
         status: "Draft",
         sentAt: "",
       });
@@ -196,58 +187,7 @@ export default function MessagesPage() {
     },
   };
 
-  async function handlePictureSelected(event: ChangeEvent<HTMLInputElement>, mode: "new" | "edit") {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setToast({ open: true, message: "Please choose an image file", severity: "error" });
-      event.target.value = "";
-      return;
-    }
-
-    try {
-      setUploadingMode(mode);
-      const result = await uploadMessageImage(file);
-      if (result.error) {
-        setToast({ open: true, message: result.error, severity: "error" });
-        return;
-      }
-
-      const attachmentUrl = result.url;
-      if (mode === "new") {
-        setNewMessage((currentMessage) => ({
-          ...currentMessage,
-          attachmentUrl,
-          attachmentFileName: result.fileName || file.name,
-          attachmentMimeType: result.mimeType || file.type,
-        }));
-      } else {
-        setEditingMessage((currentMessage: any) =>
-          currentMessage
-            ? {
-                ...currentMessage,
-                attachmentUrl,
-                attachmenturl: attachmentUrl,
-                attachmentFileName: result.fileName || file.name,
-                attachmentfilename: result.fileName || file.name,
-                attachmentMimeType: result.mimeType || file.type,
-                attachmentmimetype: result.mimeType || file.type,
-              }
-            : currentMessage,
-        );
-      }
-      setToast({ open: true, message: "Picture attached successfully", severity: "success" });
-    } catch {
-      setToast({ open: true, message: "Failed to load picture", severity: "error" });
-    } finally {
-      setUploadingMode(null);
-    }
-
-    event.target.value = "";
-  }
-
-  function renderImagePreview(imageUrl: string, altText: string) {
+  function renderImagePreview(imageUrl: string, altText: string, size: number = 96) {
     if (!imageUrl) return null;
 
     return (
@@ -256,8 +196,8 @@ export default function MessagesPage() {
         src={imageUrl}
         alt={altText}
         sx={{
-          width: 96,
-          height: 96,
+          width: size,
+          height: size,
           objectFit: "cover",
           borderRadius: 2,
           border: "1px solid rgba(255,255,255,0.2)",
@@ -317,13 +257,6 @@ export default function MessagesPage() {
               {messages.map(m => <MenuItem key={m.messageid} value={m.messageid}>{String(m.messageid)}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="messages-fk-filter">Foreign Key (companyId)</InputLabel>
-            <Select labelId="messages-fk-filter" value={fkFilter} label="Foreign Key (companyId)" onChange={(e)=>{const v = e.target.value as unknown as string; setFkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
-              <MenuItem value="">All</MenuItem>
-              {[...new Set(messages.map(m => m.companyid))].map(cid => <MenuItem key={cid} value={cid}>{String(cid)}</MenuItem>)}
-            </Select>
-          </FormControl>
         </Box>
 
         <Pagination
@@ -346,6 +279,15 @@ export default function MessagesPage() {
         </CardContent>
       </Card>
 
+      {activeTemplateImage && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 1 }}>Default Template Image</Typography>
+            {renderImagePreview(activeTemplateImage, "Default template image")}
+          </CardContent>
+        </Card>
+      )}
+
       <Divider sx={{ my: 2 }} />
 
       <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
@@ -363,7 +305,6 @@ export default function MessagesPage() {
           <TableBody>
             {messages
               .filter((m) => (pkFilter === "" ? true : m.messageid === pkFilter))
-              .filter((m) => (fkFilter === "" ? true : m.companyid === fkFilter))
               .map((message) => (
               <TableRow
                 key={message.messageid}
@@ -481,39 +422,9 @@ export default function MessagesPage() {
           onChange={(e) => setNewMessage({ ...newMessage, messageBody: e.target.value })}
           {...textFieldProps}
         />
-        <TextField
-          label="Attachment URL"
-          value={newMessage.attachmentUrl}
-          onChange={(e) => setNewMessage({ ...newMessage, attachmentUrl: e.target.value })}
-          {...textFieldProps}
-        />
-        <TextField
-          label="Attachment File Name"
-          value={newMessage.attachmentFileName}
-          onChange={(e) => setNewMessage({ ...newMessage, attachmentFileName: e.target.value })}
-          {...textFieldProps}
-        />
-        <TextField
-          label="Attachment Mime Type"
-          value={newMessage.attachmentMimeType}
-          onChange={(e) => setNewMessage({ ...newMessage, attachmentMimeType: e.target.value })}
-          {...textFieldProps}
-        />
-        <input
-          ref={newPictureInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(event) => handlePictureSelected(event, "new")}
-        />
-        <Button
-          variant="outlined"
-          onClick={() => newPictureInputRef.current?.click()}
-          disabled={uploadingMode === "new"}
-        >
-          {uploadingMode === "new" ? "Uploading..." : "Upload Picture"}
-        </Button>
-        {renderImagePreview(newMessage.attachmentUrl, newMessage.attachmentFileName || "Selected picture")}
+        <Typography variant="body2" sx={{ color: "text.secondary", alignSelf: "center" }}>
+          Uses the shared template image automatically.
+        </Typography>
         <FormControl sx={{ minWidth: 160 }}>
           <InputLabel id="new-message-status-label">Status</InputLabel>
           <Select
@@ -554,6 +465,7 @@ export default function MessagesPage() {
           <Typography variant="h6" gutterBottom>
             Template Preview
           </Typography>
+          {activeTemplateImage && <Box sx={{ mb: 2 }}>{renderImagePreview(activeTemplateImage, "Template image", 220)}</Box>}
           <Typography variant="subtitle2">Subject</Typography>
           <Typography sx={{ mb: 2 }}>{templatePreview.subject}</Typography>
           <Typography variant="subtitle2">Body</Typography>
@@ -606,39 +518,9 @@ export default function MessagesPage() {
               onChange={(e) => setEditingMessage({ ...editingMessage, messageBody: e.target.value, messagebody: e.target.value })}
               {...textFieldProps}
             />
-            <TextField
-              label="Attachment URL"
-              value={editingMessage.attachmenturl || ""}
-              onChange={(e) => setEditingMessage({ ...editingMessage, attachmentUrl: e.target.value, attachmenturl: e.target.value })}
-              {...textFieldProps}
-            />
-            <TextField
-              label="Attachment File Name"
-              value={editingMessage.attachmentfilename || ""}
-              onChange={(e) => setEditingMessage({ ...editingMessage, attachmentFileName: e.target.value, attachmentfilename: e.target.value })}
-              {...textFieldProps}
-            />
-            <TextField
-              label="Attachment Mime Type"
-              value={editingMessage.attachmentmimetype || ""}
-              onChange={(e) => setEditingMessage({ ...editingMessage, attachmentMimeType: e.target.value, attachmentmimetype: e.target.value })}
-              {...textFieldProps}
-            />
-            <input
-              ref={editPictureInputRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(event) => handlePictureSelected(event, "edit")}
-            />
-            <Button
-              variant="outlined"
-              onClick={() => editPictureInputRef.current?.click()}
-              disabled={uploadingMode === "edit"}
-            >
-              {uploadingMode === "edit" ? "Uploading..." : "Upload Picture"}
-            </Button>
-            {renderImagePreview(editingMessage.attachmenturl || editingMessage.attachmentUrl || "", editingMessage.attachmentfilename || "Selected picture")}
+            <Typography variant="body2" sx={{ color: "text.secondary", alignSelf: "center" }}>
+              Uses the shared template image automatically.
+            </Typography>
             <FormControl sx={{ minWidth: 160 }}>
               <InputLabel id="edit-message-status-label">Status</InputLabel>
               <Select

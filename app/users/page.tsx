@@ -20,6 +20,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useRouter } from "next/navigation";
 
 import {
@@ -44,10 +45,11 @@ export default function UsersPage() {
     password: "",
     roleid: 2,
     email: "",
-    companyId: 1,
   });
 
   const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
@@ -77,10 +79,11 @@ export default function UsersPage() {
   }
 
   async function handleAdd() {
+    setDialogError(null);
     const res = await addUser(newUser);
 
     if (res.error) {
-      setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadUsers();
       setNewUser({
@@ -88,8 +91,8 @@ export default function UsersPage() {
         password: "",
         roleid: 2,
         email: "",
-        companyId: 1,
       });
+      setAddDialogOpen(false);
       setToast({ open: true, message: "User created successfully", severity: "success" });
     }
   }
@@ -108,14 +111,16 @@ export default function UsersPage() {
   async function handleUpdate() {
     if (!editingUser) return;
 
+    setDialogError(null);
+
     if (isChangingPassword) {
       if (!editingUser.password) {
-        setError("New password is required");
+        setDialogError("New password is required");
         return;
       }
 
       if (editingUser.password !== editingUser.confirmPassword) {
-        setError("Passwords do not match");
+        setDialogError("Passwords do not match");
         return;
       }
     }
@@ -125,34 +130,52 @@ export default function UsersPage() {
       username: editingUser.username,
       email: editingUser.email,
       roleid: editingUser.roleid,
-      companyId: editingUser.companyId,
       ...(isChangingPassword ? { password: editingUser.password } : {}),
     };
 
     const res = await updateUser(userToUpdate);
 
     if (res.error) {
-      setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadUsers();
       setEditingUser(null);
       setIsChangingPassword(false);
+      setDialogError(null);
       setToast({ open: true, message: "User updated successfully", severity: "success" });
     }
   }
 
-  const textFieldProps = {
+  const dialogTextFieldProps = {
     slotProps: {
       input: {
         sx: {
-          color: "#fff",
+          color: "#111827",
+          "& input": {
+            color: "#111827",
+            WebkitTextFillColor: "#111827",
+          },
         },
       },
       inputLabel: {
         sx: {
-          color: "#ccc",
+          color: "#4b5563",
+          fontWeight: 600,
+          "&.Mui-focused": {
+            color: "#111827",
+          },
         },
+        shrink: true,
       },
+    },
+  };
+
+  const dialogPaperProps = {
+    sx: {
+      backgroundColor: "#fff",
+      color: "#111827",
+      opacity: 1,
+      boxShadow: 24,
     },
   };
 
@@ -162,9 +185,14 @@ export default function UsersPage() {
         Back
       </Button>
 
-      <Typography variant="h4" gutterBottom>
-        Users
-      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 2 }}>
+        <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>
+          Users
+        </Typography>
+        <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
+          Add Users
+        </Button>
+      </Box>
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
@@ -178,13 +206,6 @@ export default function UsersPage() {
           <Select labelId="users-pk-filter" value={pkFilter} label="Primary Key" onChange={(e)=>{const v = e.target.value as unknown as string; setPkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
             <MenuItem value="">All</MenuItem>
             {users.map(u => <MenuItem key={u.userid} value={u.userid}>{String(u.userid)}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="users-fk-filter">Foreign Key (companyId)</InputLabel>
-          <Select labelId="users-fk-filter" value={fkFilter} label="Foreign Key (companyId)" onChange={(e)=>{const v = e.target.value as unknown as string; setFkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
-            <MenuItem value="">All</MenuItem>
-            {[...new Set(users.map(u => u.companyid))].map(cid => <MenuItem key={cid} value={cid}>{String(cid)}</MenuItem>)}
           </Select>
         </FormControl>
       </Box>
@@ -203,15 +224,15 @@ export default function UsersPage() {
           <TableBody>
             {users
               .filter((u) => (pkFilter === "" ? true : u.userid === pkFilter))
-              .filter((u) => (fkFilter === "" ? true : u.companyid === fkFilter))
               .map((user) => (
               <TableRow
                 key={user.userid}
                 hover
                 selected={editingUser?.userid === user.userid}
-                onClick={() => {
+                onDoubleClick={() => {
                   setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
                   setIsChangingPassword(false);
+                  setDialogError(null);
                 }}
                 sx={{
                   cursor: "pointer",
@@ -244,9 +265,10 @@ export default function UsersPage() {
                       e.stopPropagation();
                       setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
                       setIsChangingPassword(false);
+                      setDialogError(null);
                     }}
                   >
-                    Edit
+                    View/Edit
                   </Button>
                 </TableCell>
               </TableRow>
@@ -255,184 +277,71 @@ export default function UsersPage() {
         </Table>
       </TableContainer>
 
-      <Typography variant="h6" gutterBottom>
-        Add User
-      </Typography>
-
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          mb: 4,
-          flexWrap: "wrap",
-        }}
-      >
-        <TextField
-          label="Username"
-          value={newUser.username}
-          onChange={(e) =>
-            setNewUser({
-              ...newUser,
-              username: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Email"
-          value={newUser.email}
-          onChange={(e) =>
-            setNewUser({
-              ...newUser,
-              email: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <FormControl>
-          <InputLabel id="new-user-role-label">Role</InputLabel>
-          <Select
-            labelId="new-user-role-label"
-            value={newUser.roleid}
-            label="Role"
-            onChange={(e) =>
-              setNewUser({
-                ...newUser,
-                roleid: Number(e.target.value),
-              })
-            }
-          >
-            {ROLE_OPTIONS.map((role) => (
-              <MenuItem key={role.roleid} value={role.roleid}>
-                {role.rolename}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <TextField
-          label="Password"
-          type="password"
-          value={newUser.password}
-          onChange={(e) =>
-            setNewUser({
-              ...newUser,
-              password: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <Button variant="contained" onClick={handleAdd}>
-          Add
-        </Button>
-      </Box>
-
-      {editingUser && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Edit User
-          </Typography>
-
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              flexWrap: "wrap",
-            }}
-          >
-            <TextField
-              label="Username"
-              value={editingUser.username}
-              onChange={(e) =>
-                setEditingUser({
-                  ...editingUser,
-                  username: e.target.value,
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <TextField
-              label="Email"
-              value={editingUser.email}
-              onChange={(e) =>
-                setEditingUser({
-                  ...editingUser,
-                  email: e.target.value,
-                })
-              }
-              {...textFieldProps}
-            />
-
+      <Dialog open={addDialogOpen} onClose={() => { setAddDialogOpen(false); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
+        <DialogTitle>Add User</DialogTitle>
+        <DialogContent>
+          {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
+          <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
+            <TextField label="Username" value={newUser.username} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, username: e.target.value }); }} {...dialogTextFieldProps} />
+            <TextField label="Email" value={newUser.email} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, email: e.target.value }); }} {...dialogTextFieldProps} />
             <FormControl>
-              <InputLabel id="editing-user-role-label">Role</InputLabel>
+              <InputLabel id="new-user-role-label">Role</InputLabel>
               <Select
-                labelId="editing-user-role-label"
-                value={editingUser.roleid ?? ""}
+                labelId="new-user-role-label"
+                value={newUser.roleid}
                 label="Role"
-                onChange={(e) =>
-                  setEditingUser({
-                    ...editingUser,
-                    roleid: Number(e.target.value),
-                  })
-                }
+                onChange={(e) => setNewUser({ ...newUser, roleid: Number(e.target.value) })}
               >
                 {ROLE_OPTIONS.map((role) => (
-                  <MenuItem key={role.roleid} value={role.roleid}>
-                    {role.rolename}
-                  </MenuItem>
+                  <MenuItem key={role.roleid} value={role.roleid}>{role.rolename}</MenuItem>
                 ))}
               </Select>
             </FormControl>
-
-            <Button
-              variant="outlined"
-              onClick={() =>
-                setIsChangingPassword((currentValue) => !currentValue)
-              }
-            >
-              Change Password
-            </Button>
-
-            {isChangingPassword && (
-              <>
-                <TextField
-                  label="New Password"
-                  type="password"
-                  value={editingUser.password ?? ""}
-                  onChange={(e) =>
-                    setEditingUser({
-                      ...editingUser,
-                      password: e.target.value,
-                    })
-                  }
-                  {...textFieldProps}
-                />
-
-                <TextField
-                  label="Confirm Password"
-                  type="password"
-                  value={editingUser.confirmPassword ?? ""}
-                  onChange={(e) =>
-                    setEditingUser({
-                      ...editingUser,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  {...textFieldProps}
-                />
-              </>
-            )}
-
-            <Button variant="contained" onClick={handleUpdate}>
-              Save
-            </Button>
+            <TextField label="Password" type="password" value={newUser.password} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, password: e.target.value }); }} {...dialogTextFieldProps} />
           </Box>
-        </Box>
-      )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setAddDialogOpen(false); setDialogError(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleAdd}>Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(editingUser)} onClose={() => { setEditingUser(null); setIsChangingPassword(false); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
+        <DialogTitle>View/Edit User</DialogTitle>
+        <DialogContent>
+          {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
+          {editingUser && (
+            <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
+              <TextField label="Username" value={editingUser.username} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, username: e.target.value }); }} {...dialogTextFieldProps} />
+              <TextField label="Email" value={editingUser.email} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, email: e.target.value }); }} {...dialogTextFieldProps} />
+              <FormControl>
+                <InputLabel id="editing-user-role-label">Role</InputLabel>
+                <Select
+                  labelId="editing-user-role-label"
+                  value={editingUser.roleid ?? ""}
+                  label="Role"
+                  onChange={(e) => setEditingUser({ ...editingUser, roleid: Number(e.target.value) })}
+                >
+                  {ROLE_OPTIONS.map((role) => (
+                    <MenuItem key={role.roleid} value={role.roleid}>{role.rolename}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Button variant="outlined" onClick={() => setIsChangingPassword((currentValue) => !currentValue)}>Change Password</Button>
+              {isChangingPassword && (
+                <>
+                  <TextField label="New Password" type="password" value={editingUser.password ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, password: e.target.value }); }} {...dialogTextFieldProps} />
+                  <TextField label="Confirm Password" type="password" value={editingUser.confirmPassword ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, confirmPassword: e.target.value }); }} {...dialogTextFieldProps} />
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setEditingUser(null); setIsChangingPassword(false); setDialogError(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleUpdate}>Save</Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={toast.open}
         autoHideDuration={3000}

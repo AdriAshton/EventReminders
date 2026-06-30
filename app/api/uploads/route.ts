@@ -3,6 +3,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,6 @@ function sanitizeFileName(fileName: string) {
 
 export async function POST(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -36,20 +36,27 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", "messages", String(decoded.companyid));
+    const processed = await sharp(buffer)
+      .rotate()
+      .resize({ width: 1200, withoutEnlargement: true, fit: "inside" })
+      .webp({ quality: 78 })
+      .toBuffer({ resolveWithObject: true });
+
+    const uploadsDir = path.join(process.cwd(), "public", "uploads", "messages");
     await mkdir(uploadsDir, { recursive: true });
 
     const safeName = sanitizeFileName(file.name || "upload");
-    const fileName = `${Date.now()}-${randomUUID()}-${safeName}`;
+    const baseName = safeName.replace(/\.[^.]+$/, "") || "upload";
+    const fileName = `${Date.now()}-${randomUUID()}-${baseName}.webp`;
     const filePath = path.join(uploadsDir, fileName);
 
-    await writeFile(filePath, buffer);
+    await writeFile(filePath, processed.data);
 
     return NextResponse.json({
-      url: `/uploads/messages/${decoded.companyid}/${fileName}`,
-      fileName: file.name,
-      mimeType: file.type,
-      size: file.size,
+      url: `/uploads/messages/${fileName}`,
+      fileName: fileName,
+      mimeType: "image/webp",
+      size: processed.data.length,
     });
   } catch (err: any) {
     const status = err?.message === "Unauthorized" ? 401 : 500;

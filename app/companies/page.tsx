@@ -20,6 +20,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useRouter } from "next/navigation";
 
 import {
@@ -32,7 +33,6 @@ import {
 export default function CompaniesPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<any[]>([]);
-  const [pkFilter, setPkFilter] = useState<number | string>("");
   const [newCompany, setNewCompany] = useState({
     companyname: "",
     contactemail: "",
@@ -40,6 +40,8 @@ export default function CompaniesPage() {
   });
 
   const [editingCompany, setEditingCompany] = useState<any | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
@@ -61,10 +63,23 @@ export default function CompaniesPage() {
   }
 
   async function handleAdd() {
+    setDialogError(null);
+    if (!newCompany.companyname.trim()) {
+      setDialogError("Company name is required");
+      return;
+    }
+    if (!newCompany.contactemail.trim()) {
+      setDialogError("Contact email is required");
+      return;
+    }
+    if (!newCompany.contactphone.trim()) {
+      setDialogError("Contact phone is required");
+      return;
+    }
     const res = await addCompany(newCompany);
 
     if (res.error) {
-      setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadCompanies();
 
@@ -73,6 +88,7 @@ export default function CompaniesPage() {
         contactemail: "",
         contactphone: "",
       });
+      setAddDialogOpen(false);
       setToast({ open: true, message: "Company created successfully", severity: "success" });
     }
   }
@@ -91,41 +107,79 @@ export default function CompaniesPage() {
   async function handleUpdate() {
     if (!editingCompany) return;
 
+    setDialogError(null);
+
+    if (!String(editingCompany.companyname || "").trim()) {
+      setDialogError("Company name is required");
+      return;
+    }
+    if (!String(editingCompany.contactemail || "").trim()) {
+      setDialogError("Contact email is required");
+      return;
+    }
+    if (!String(editingCompany.contactphone || "").trim()) {
+      setDialogError("Contact phone is required");
+      return;
+    }
+
     const res = await updateCompany(editingCompany);
 
     if (res.error) {
-      setError(res.error);
+      setDialogError(res.error);
     } else {
       await loadCompanies();
       setEditingCompany(null);
+      setDialogError(null);
       setToast({ open: true, message: "Company updated successfully", severity: "success" });
     }
   }
 
-  const textFieldProps = {
+  const dialogTextFieldProps = {
     slotProps: {
       input: {
         sx: {
-          color: "#fff",
+          color: "#111827",
+          "& input": {
+            color: "#111827",
+            WebkitTextFillColor: "#111827",
+          },
         },
       },
       inputLabel: {
         sx: {
-          color: "#ccc",
+          color: "#4b5563",
+          fontWeight: 600,
+          "&.Mui-focused": {
+            color: "#111827",
+          },
         },
+        shrink: true,
       },
+    },
+  };
+
+  const dialogPaperProps = {
+    sx: {
+      backgroundColor: "#fff",
+      color: "#111827",
+      opacity: 1,
+      boxShadow: 24,
     },
   };
 
   return (
     <Box sx={{ p: 3 }}>
-      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 2 }}>
-        Back
-      </Button>
-
       <Typography variant="h4" gutterBottom>
         Companies
       </Typography>
+
+
+    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+         <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+         <Button variant="contained" onClick={() => setAddDialogOpen(true)}>Add Company</Button>
+    </Box>
+
+   
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
@@ -133,15 +187,7 @@ export default function CompaniesPage() {
         </Typography>
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="companies-pk-filter">Primary Key</InputLabel>
-          <Select labelId="companies-pk-filter" value={pkFilter} label="Primary Key" onChange={(e)=>{const v = e.target.value as unknown as string; setPkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
-            <MenuItem value="">All</MenuItem>
-            {companies.map(c => <MenuItem key={c.companyid} value={c.companyid}>{String(c.companyid)}</MenuItem>)}
-          </Select>
-        </FormControl>
-      </Box>
+  
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
         <Table>
@@ -155,14 +201,15 @@ export default function CompaniesPage() {
           </TableHead>
 
           <TableBody>
-            {companies
-              .filter((c) => (pkFilter === "" ? true : c.companyid === pkFilter))
-              .map((company) => (
+            {companies.map((company) => (
               <TableRow
                 key={company.companyid}
                 hover
                 selected={editingCompany?.companyid === company.companyid}
-                onClick={() => setEditingCompany(company)}
+                onDoubleClick={() => {
+                  setEditingCompany(company);
+                  setDialogError(null);
+                }}
                 sx={{
                   cursor: "pointer",
                   "&.Mui-selected": {
@@ -193,9 +240,10 @@ export default function CompaniesPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingCompany(company);
+                      setDialogError(null);
                     }}
                   >
-                    Edit
+                    View/Edit
                   </Button>
                 </TableCell>
               </TableRow>
@@ -204,114 +252,83 @@ export default function CompaniesPage() {
         </Table>
       </TableContainer>
 
-      <Typography variant="h6" gutterBottom>
-        Add Company
-      </Typography>
-
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          mb: 4,
-          flexWrap: "wrap",
-        }}
-      >
-        <TextField
-          label="Company Name"
-          value={newCompany.companyname}
-          onChange={(e) =>
-            setNewCompany({
-              ...newCompany,
-              companyname: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Contact Email"
-          value={newCompany.contactemail}
-          onChange={(e) =>
-            setNewCompany({
-              ...newCompany,
-              contactemail: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Contact Phone"
-          value={newCompany.contactphone}
-          onChange={(e) =>
-            setNewCompany({
-              ...newCompany,
-              contactphone: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <Button variant="contained" onClick={handleAdd}>
-          Add
-        </Button>
-      </Box>
-
-      {editingCompany && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Edit Company
-          </Typography>
-
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              flexWrap: "wrap",
-            }}
-          >
+      <Dialog open={addDialogOpen} onClose={() => { setAddDialogOpen(false); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
+        <DialogTitle>Add Company</DialogTitle>
+        <DialogContent>
+          {dialogError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {dialogError}
+            </Typography>
+          )}
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 1 }}>
             <TextField
               label="Company Name"
-              value={editingCompany.companyname}
-              onChange={(e) =>
-                setEditingCompany({
-                  ...editingCompany,
-                  companyname: e.target.value,
-                })
-              }
-              {...textFieldProps}
+              value={newCompany.companyname}
+              onChange={(e) => setNewCompany({ ...newCompany, companyname: e.target.value })}
+              required
+              {...dialogTextFieldProps}
             />
-
             <TextField
               label="Contact Email"
-              value={editingCompany.contactemail ?? ""}
-              onChange={(e) =>
-                setEditingCompany({
-                  ...editingCompany,
-                  contactemail: e.target.value,
-                })
-              }
-              {...textFieldProps}
+              value={newCompany.contactemail}
+              onChange={(e) => setNewCompany({ ...newCompany, contactemail: e.target.value })}
+              required
+              {...dialogTextFieldProps}
             />
-
             <TextField
               label="Contact Phone"
-              value={editingCompany.contactphone ?? ""}
-              onChange={(e) =>
-                setEditingCompany({
-                  ...editingCompany,
-                  contactphone: e.target.value,
-                })
-              }
-              {...textFieldProps}
+              value={newCompany.contactphone}
+              onChange={(e) => setNewCompany({ ...newCompany, contactphone: e.target.value })}
+              required
+              {...dialogTextFieldProps}
             />
-
-            <Button variant="contained" onClick={handleUpdate}>
-              Save
-            </Button>
           </Box>
-        </Box>
-      )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setAddDialogOpen(false); setDialogError(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleAdd}>Add Company</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(editingCompany)} onClose={() => { setEditingCompany(null); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
+        <DialogTitle>View/Edit Company</DialogTitle>
+        <DialogContent>
+          {dialogError && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {dialogError}
+            </Typography>
+          )}
+          {editingCompany && (
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 1 }}>
+              <TextField
+                label="Company Name"
+                value={editingCompany.companyname}
+                onChange={(e) => setEditingCompany({ ...editingCompany, companyname: e.target.value })}
+                required
+                {...dialogTextFieldProps}
+              />
+              <TextField
+                label="Contact Email"
+                value={editingCompany.contactemail ?? ""}
+                onChange={(e) => setEditingCompany({ ...editingCompany, contactemail: e.target.value })}
+                required
+                {...dialogTextFieldProps}
+              />
+              <TextField
+                label="Contact Phone"
+                value={editingCompany.contactphone ?? ""}
+                onChange={(e) => setEditingCompany({ ...editingCompany, contactphone: e.target.value })}
+                required
+                {...dialogTextFieldProps}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setEditingCompany(null); setDialogError(null); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleUpdate} disabled={!editingCompany}>Save</Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={toast.open}
         autoHideDuration={3000}

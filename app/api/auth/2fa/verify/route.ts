@@ -29,8 +29,11 @@ export async function POST(req: Request) {
         const userRes = await pool.query('SELECT userid, companyid, username, roleid FROM users WHERE userid = $1', [userId]);
         const user = userRes.rows[0] || {};
         const roleRes = await pool.query('SELECT rolename FROM roles WHERE roleid = $1', [user.roleid]);
-        const role = roleRes.rows[0]?.rolename || null;
-        const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+        const role = roleRes.rows[0]?.rolename;
+        if (!role || !user.roleid) {
+          return NextResponse.json({ error: 'A valid role is required to log in' }, { status: 403 });
+        }
+        const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
         return NextResponse.json({ verified: true, token: jwtToken });
       }
       // fallthrough to TOTP check if code mismatches or expired
@@ -52,8 +55,11 @@ export async function POST(req: Request) {
     const userRes = await pool.query('SELECT userid, companyid, username, roleid FROM users WHERE userid = $1', [userId]);
     const user = userRes.rows[0] || {};
     const roleRes = await pool.query('SELECT rolename FROM roles WHERE roleid = $1', [user.roleid]);
-    const role = roleRes.rows[0]?.rolename || null;
-    const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+    const role = roleRes.rows[0]?.rolename;
+    if (!role || !user.roleid) {
+      return NextResponse.json({ error: 'A valid role is required to log in' }, { status: 403 });
+    }
+    const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
 
     return NextResponse.json({ verified: true, token: jwtToken });
   } catch (err: any) {

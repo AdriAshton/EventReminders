@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import pool from "@/lib/db"; // adjust path if your db connection is elsewhere
 
 export async function POST(req: Request) {
-  const { username, email, password, companyid } = await req.json();
+  const { username, email, password } = await req.json();
 
   // ✅ Basic validation
   if (!username || !email || !password) {
@@ -28,9 +28,9 @@ export async function POST(req: Request) {
     }
 
     await pool.query(
-      `INSERT INTO users (username, email, passwordhash, companyid, roleid) 
-       VALUES ($1, $2, $3, $4, $5)`,
-      [username.trim(), email.trim(), hash, companyid, defaultRoleId]
+      `INSERT INTO users (username, email, passwordhash, roleid) 
+       VALUES ($1, $2, $3, $4)`,
+      [username.trim(), email.trim(), hash, defaultRoleId]
     );
 
     return NextResponse.json(

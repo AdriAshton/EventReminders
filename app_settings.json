@@ -3,6 +3,10 @@
   "email": {
     "provider": "gmail"
   },
+  "reminderDelivery": {
+    "sendTime": "21:30",
+    "channel": "Email"
+  },
   "messageTemplates": {
     "activeTemplateId": "birthday-default",
     "templates": [
@@ -10,7 +14,15 @@
         "id": "birthday-default",
         "name": "Default Birthday Template",
         "subject": "Happy Birthday, {{clientName}}!",
-        "body": "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}"
+        "body": "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest wishes,\n{{senderName}}",
+        "imageUrl": "/uploads/messages/1/1781808896712-b93add05-1175-49b4-903e-0b2dfdd865d3-DCS_4335_copy.webp"
+      },
+      {
+        "id": "template-2",
+        "name": "Template 2",
+        "subject": "Happy Birthday, {{clientName}}!",
+        "body": "Happy Birthday {{clientName}}!\n\nEveryone at {{companyName}} wishes you a wonderful day.\n\nBest regards,\n{{companyName}}\n",
+        "imageUrl": ""
       }
     ]
   }

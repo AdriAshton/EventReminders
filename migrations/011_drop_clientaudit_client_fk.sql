@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE IF EXISTS ClientAudit
+    DROP CONSTRAINT IF EXISTS fk_client_audit_client,
+    DROP CONSTRAINT IF EXISTS fk_client;
+
+COMMIT;

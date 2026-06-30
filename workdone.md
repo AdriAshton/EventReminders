@@ -164,6 +164,19 @@ A Material UI typing issue was investigated and the current file shows the corre
 - The file also now uses controlled values for the add form inputs and resets the form after a successful add.
 - The delete and edit buttons stop row click propagation, which avoids accidental row selection while clicking actions.
 
+### Birthday reminders, migrations, and clients UI refresh
+- Added `Birthdate` as the source of truth for birthday reminders and removed the old event/event-type flow from the app.
+- Created migration `migrations/010_clients_birthdays_remove_events.sql` to backfill client birthdays, make `Birthdate` required, convert reminders to `ClientId`, and remove the old event tables.
+- Added migration `migrations/011_drop_clientaudit_client_fk.sql` and updated the audit schema so deleting a client no longer fails on the `ClientAudit` foreign key.
+- Updated `scripts/run_migrations.js` to load `.env.local` / `.env` automatically, which lets `npm run migrate` work from the project root.
+- Set the local `DATABASE_URL` in `.env.local` to `postgres://postgres:password@localhost:5432/birthday_reminder`.
+- Verified the migration runner completes successfully against the local database.
+- Removed the birthday-day filter from the clients screen after it was requested back out.
+- Moved the add-client form into a popup dialog and placed an `Add` action beside `View` in each row.
+- Made the add/edit dialogs opaque and fixed the birthday field readability inside the popup.
+- Updated the clients pagination styling so the selected page matches the active theme color and the bottom paginator is more visible.
+- Confirmed the clients page and the full project build validate successfully after the UI and migration changes.
+
 ## Inferred Project History
 
 These items are likely true based on the repo state, but they are not fully proven from chat-visible history alone:
@@ -307,6 +320,17 @@ This log is therefore a reconstruction from the current codebase and visible ses
 ## Suggested Ongoing Use
 
 Append new entries below this section whenever work is done.
+
+### 2026-06-29
+
+#### Recent work since the last update
+- Updated the work log to reflect the current app surface, including the active `clients`, `companies`, `events`, `reminders`, `messages`, `users`, `login`, `signup`, and `settings` areas under the Next.js App Router.
+- Confirmed the supporting service layer still centers on `auth`, `clientService`, `CompanyService`, `messageService`, `reminderServices`, and `userService`.
+- Rechecked the project TODOs and kept the remaining open UI work focused on user-friendliness improvements such as dropdowns, templates, customizable message formats, undo delete, and the security screen.
+- Preserved the existing build-history notes so the log still reflects the last verified successful project state.
+
+#### Documentation status
+- This log has been left as a best-effort reconstruction and should continue to be appended with short dated entries as new work is completed.
 
 ## Change Log
 

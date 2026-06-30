@@ -1,0 +1,11 @@
+firstname,lastname,email,phone,birthdate,companyid
+John,Smith,john.smith@example.com,155,12/04/1990,1
+Jane,Doe,jane.doe@example.com,15551234568,23/09/1988,1
+Michael,Johnson,michael.johnson@example.com,15551234569,05/01/1992,1
+Emily,Williams,emily.williams@example.com,15551234570,18/11/1995,1
+David,Brown,david.brown@example.com,15551234571,30/07/1985,1
+Sarah,Jones,sarah.jones@example.com,15551234572,14/03/1993,1
+Chris,Garcia,chris.garcia@example.com,15551234573,01/12/1991,1
+Olivia,Miller,olivia.miller@example.com,15551234574,22/06/1989,1
+Daniel,Martinez,daniel.martinez@example.com,15551234575,09/10/1994,1
+Sophia,Anderson,sophia.anderson@example.com,15551234576,27/02/1996,1

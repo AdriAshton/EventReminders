@@ -15,14 +15,12 @@ function verifyToken(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const result = await pool.query(
-      `SELECT u.userid, u.companyid, u.username, u.roleid, r.rolename AS role, u.email
+      `SELECT u.userid, u.username, u.roleid, r.rolename AS role, u.email
        FROM users u
        JOIN roles r ON r.roleid = u.roleid
-       WHERE u.companyid = $1
        ORDER BY u.userid ASC`,
-      [decoded.companyid]
+      []
     );
 
     return NextResponse.json(result.rows);
@@ -33,7 +31,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const { username, password, roleid, email } = await req.json();
 
     if (!username) {
@@ -51,10 +48,10 @@ export async function POST(req: Request) {
 
     const passwordhash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO users (companyid, username, passwordhash, roleid, email)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING userid, companyid, username, roleid, email`,
-      [decoded.companyid, username.trim(), passwordhash, Number(roleid), email.trim()]
+      `INSERT INTO users (username, passwordhash, roleid, email)
+       VALUES ($1, $2, $3, $4)
+       RETURNING userid, username, roleid, email`,
+      [username.trim(), passwordhash, Number(roleid), email.trim()]
     );
 
     return NextResponse.json(result.rows[0], { status: 201 });
@@ -65,7 +62,6 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const { userid, username, password, roleid, email } = await req.json();
 
     if (!username) {
@@ -83,15 +79,15 @@ export async function PUT(req: Request) {
       await pool.query(
         `UPDATE users
          SET username = $1, passwordhash = $2, roleid = $3, email = $4
-         WHERE userid = $5 AND companyid = $6`,
-        [username.trim(), passwordhash, Number(roleid), email.trim(), userid, decoded.companyid]
+         WHERE userid = $5`,
+        [username.trim(), passwordhash, Number(roleid), email.trim(), userid]
       );
     } else {
       await pool.query(
         `UPDATE users
          SET username = $1, roleid = $2, email = $3
-         WHERE userid = $4 AND companyid = $5`,
-        [username.trim(), Number(roleid), email.trim(), userid, decoded.companyid]
+         WHERE userid = $4`,
+        [username.trim(), Number(roleid), email.trim(), userid]
       );
     }
 
@@ -103,13 +99,9 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const decoded = verifyToken(req);
     const { userid } = await req.json();
 
-    await pool.query("DELETE FROM users WHERE userid = $1 AND companyid = $2", [
-      userid,
-      decoded.companyid,
-    ]);
+    await pool.query("DELETE FROM users WHERE userid = $1", [userid]);
 
     return NextResponse.json({ message: "User deleted successfully" });
   } catch (err: any) {

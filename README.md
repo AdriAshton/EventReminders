@@ -74,10 +74,26 @@ Run it manually with:
 npm run process-reminders
 ```
 
-Example cron entry to run it every day at 9:00 AM:
+Example cron entry to run it every minute:
 
 ```cron
-0 9 * * * cd /path/to/birthday-reminder && node ./scripts/process_recurring_reminders.js
+* * * * * cd /path/to/birthday-reminder && node ./scripts/process_recurring_reminders.js
 ```
 
 If you are running the app on a hosted URL, the script will call that URL through `APP_URL`.
+
+## Vercel Cron
+
+The app is already configured for Vercel Cron in `vercel.json`:
+
+- Path: `/api/jobs/process-recurring-reminders`
+- Schedule: `* * * * *` (every minute)
+
+To use it in production:
+
+1. Deploy the app to Vercel.
+2. Set `APP_URL` to your deployed URL.
+3. Set `JOB_SECRET` in Vercel Environment Variables.
+4. Keep `vercel.json` committed so Vercel registers the cron route.
+
+The cron request is accepted either by the shared `JOB_SECRET` header or by Vercel's `x-vercel-cron` header.

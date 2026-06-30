@@ -6,7 +6,6 @@ const protectedPagePrefixes = [
   "/dashboard",
   "/clients",
   "/companies",
-  "/events",
   "/messages",
   "/reminders",
   "/settings",
@@ -16,8 +15,6 @@ const protectedPagePrefixes = [
 const protectedApiPrefixes = [
   "/api/clients",
   "/api/companies",
-  "/api/event-types",
-  "/api/events",
   "/api/messages",
   "/api/reminders",
   "/api/templates/render",
@@ -75,8 +72,6 @@ export const config = {
   matcher: [
     "/api/clients/:path*",
     "/api/companies/:path*",
-    "/api/event-types/:path*",
-    "/api/events/:path*",
     "/api/messages/:path*",
     "/api/reminders/:path*",
     "/api/templates/render/:path*",
@@ -86,7 +81,6 @@ export const config = {
     "/dashboard/:path*",
     "/clients/:path*",
     "/companies/:path*",
-    "/events/:path*",
     "/messages/:path*",
     "/reminders/:path*",
     "/settings/:path*",

@@ -80,9 +80,9 @@ export default function MessageDetailPage() {
         <Typography><strong>Channel:</strong> {message.channel}</Typography>
         <Typography><strong>Subject:</strong> {message.subject || "-"}</Typography>
         <Typography><strong>Message Body:</strong> {message.messagebody}</Typography>
-        <Typography><strong>Attachment URL:</strong> {message.attachmenturl || "-"}</Typography>
-        <Typography><strong>Attachment File Name:</strong> {message.attachmentfilename || "-"}</Typography>
-        <Typography><strong>Attachment Mime Type:</strong> {message.attachmentmimetype || "-"}</Typography>
+          <Typography><strong>Template Image URL:</strong> {message.attachmenturl || "-"}</Typography>
+          <Typography><strong>Template Image File Name:</strong> {message.attachmentfilename || "-"}</Typography>
+          <Typography><strong>Template Image Mime Type:</strong> {message.attachmentmimetype || "-"}</Typography>
         {message.attachmenturl ? (
           <Box sx={{ mt: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
             <Box component="img" src={message.attachmenturl} alt={message.attachmentfilename || "attachment"} sx={{ maxWidth: 360, maxHeight: 360, borderRadius: 1, border: "1px solid rgba(0,0,0,0.08)" }} />

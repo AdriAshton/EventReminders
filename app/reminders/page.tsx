@@ -29,33 +29,18 @@ import { useRouter } from "next/navigation";
 
 import {
   getReminders,
-  addReminder,
-  deleteReminder,
-  deleteReminders,
-  updateReminder,
 } from "@/services/reminderServices";
+import { getMessages, getMessageTemplates, renderMessageTemplate } from "@/services/messageService";
 
 export default function RemindersPage() {
   const router = useRouter();
   const [reminders, setReminders] = useState<any[]>([]);
-  const [pkFilter, setPkFilter] = useState<number | string>("");
-  const [fkFilter, setFkFilter] = useState<number | string>("");
+  const [firstNameFilter, setFirstNameFilter] = useState<string>("");
+  const [lastNameFilter, setLastNameFilter] = useState<string>("");
+  const [themeColor, setThemeColor] = useState<"purple" | "red" | "green">("purple");
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [total, setTotal] = useState<number>(0);
-  const [newReminder, setNewReminder] = useState({
-    eventid: 1,
-    companyid: 1,
-    reminderdatetime: "",
-    remindermethod: "",
-    status: "Pending",
-    timingtype: "Before",
-    timingvalue: 1,
-    timingunit: "Days",
-    sendtime: "09:00",
-    isactive: true,
-  });
-
   const [editingReminder, setEditingReminder] = useState<any | null>(null);
 
   function formatDate(value: string | Date | null | undefined) {
@@ -67,18 +52,87 @@ export default function RemindersPage() {
     const year = date.getFullYear();
     return `${month}-${day}-${year}`;
   }
+
+  function formatDateInput(value: string | Date | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatSendDateTime(scheduleDate: string | Date | null | undefined, sendTime?: string | null) {
+    if (!scheduleDate) return "";
+
+    const date = new Date(scheduleDate);
+    if (Number.isNaN(date.getTime())) return String(scheduleDate);
+
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const year = date.getFullYear();
+    const timeSource = typeof sendTime === "string" && /^\d{2}:\d{2}(?::\d{2})?$/.test(sendTime)
+      ? sendTime.slice(0, 5)
+      : `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    const [hoursPart, minutesPart] = timeSource.split(":");
+    const hoursNumber = Number(hoursPart);
+    const amPm = Number.isNaN(hoursNumber) ? "" : hoursNumber >= 12 ? "PM" : "AM";
+    const displayHours = Number.isNaN(hoursNumber)
+      ? hoursPart
+      : String(((hoursNumber + 11) % 12) + 1).padStart(2, "0");
+    const timeValue = `${displayHours}:${minutesPart} ${amPm}`.trim();
+
+    return `${month}-${day}-${year} ${timeValue}`;
+  }
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
   );
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importErrors, setImportErrors] = useState<Array<{row:number,reason:string,raw?:string}>>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [activeTemplateId, setActiveTemplateId] = useState<string>("");
+  const [activeTemplateName, setActiveTemplateName] = useState<string>("Default template");
+  const [previewReminder, setPreviewReminder] = useState<any | null>(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string>("");
+  const [previewData, setPreviewData] = useState<{ subject: string; body: string; values: Record<string, string> } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [editImageOpen, setEditImageOpen] = useState(false);
+  const [editImageMessage, setEditImageMessage] = useState<any | null>(null);
+  const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string>("");
+
+  const paginationSelectedColor = {
+    purple: "#5b5fe8",
+    red: "#e11d48",
+    green: "#16a34a",
+  }[themeColor];
+
+  function resolveThemeColor() {
+    if (typeof window === "undefined") return "purple" as const;
+    const stored = localStorage.getItem("themeColor") || localStorage.getItem("theme");
+    if (stored === "red" || stored === "green" || stored === "purple") {
+      return stored;
+    }
+    return "purple" as const;
+  }
+
+  useEffect(() => {
+    const syncTheme = () => setThemeColor(resolveThemeColor());
+    syncTheme();
+    window.addEventListener("theme-change", syncTheme);
+    return () => window.removeEventListener("theme-change", syncTheme);
+  }, []);
 
   useEffect(() => {
     loadReminders(page);
   }, [page]);
+
+  useEffect(() => {
+    loadMessages();
+    loadTemplates();
+  }, []);
 
   async function loadReminders(pageParam: number = page) {
     const data = await getReminders(pageParam, pageSize);
@@ -92,58 +146,20 @@ export default function RemindersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    const res = await deleteReminder(id);
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      await loadReminders();
-      setToast({ open: true, message: "Reminder deleted successfully", severity: "success" });
+  async function loadMessages() {
+    const data = await getMessages(1, 200);
+    if (!data.error) {
+      setMessages(data.rows || []);
     }
   }
 
-  async function handleAdd() {
-    const res = await addReminder({
-      ...newReminder,
-      reminderdatetime: new Date(newReminder.reminderdatetime),
-    });
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      await loadReminders();
-
-      setNewReminder({
-        eventid: 1,
-        companyid: 1,
-        reminderdatetime: "",
-        remindermethod: "",
-        status: "Pending",
-        timingtype: "Before",
-        timingvalue: 1,
-        timingunit: "Days",
-        sendtime: "09:00",
-        isactive: true,
-      });
-      setToast({ open: true, message: "Reminder created successfully", severity: "success" });
-    }
-  }
-
-  async function handleUpdate() {
-    if (!editingReminder) return;
-
-    const res = await updateReminder({
-      ...editingReminder,
-      reminderdatetime: new Date(editingReminder.reminderdatetime),
-    });
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      await loadReminders();
-      setEditingReminder(null);
-      setToast({ open: true, message: "Reminder updated successfully", severity: "success" });
+  async function loadTemplates() {
+    const data = await getMessageTemplates();
+    if (!("error" in data)) {
+      setTemplates(data.templates || []);
+      setActiveTemplateId(data.activeTemplateId || data.template?.id || "");
+      setActiveTemplateName(data.template?.name || data.templates?.find((template: any) => template.id === (data.activeTemplateId || data.template?.id))?.name || "Default template");
+      setPreviewTemplateId(data.activeTemplateId || data.template?.id || "");
     }
   }
 
@@ -174,46 +190,93 @@ export default function RemindersPage() {
     },
   };
 
+  async function handlePreview(reminder: any) {
+    setPreviewReminder({
+      ...reminder,
+      email: reminder.email || reminder.recipient_email || reminder.clientemail || reminder.client_email || "",
+    });
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+
+    try {
+      const templateId = previewTemplateId || activeTemplateId;
+      const result = templateId ? await renderMessageTemplate(templateId, reminder.reminderid) : { error: "No message template selected" } as any;
+      if ((result as any).error) {
+        setToast({ open: true, message: (result as any).error, severity: "error" });
+        setPreviewData(null);
+        return;
+      }
+
+      setPreviewData({
+        subject: result.subject,
+        body: result.body,
+        values: result.values,
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function getReminderMessage(reminderId: number) {
+    return messages.find((message) => message.reminderid === reminderId) || null;
+  }
+
+  function getReminderDefaultImageUrl(reminderId: number) {
+    const message = getReminderMessage(reminderId);
+    if (message?.attachmenturl || message?.attachmentUrl) {
+      return message.attachmenturl || message.attachmentUrl;
+    }
+
+    const template = templates.find((item) => item.id === (previewTemplateId || activeTemplateId));
+    return template?.imageUrl || "";
+  }
+
+  function getEditImageUrl() {
+    if (editImagePreviewUrl) return editImagePreviewUrl;
+    if (!editImageMessage) return "";
+    return editImageMessage.imageUrl || editImageMessage.imageurl || getReminderDefaultImageUrl(editImageMessage.reminderid);
+  }
+
+  function openEditImage(reminder: any) {
+    const message = getReminderMessage(reminder.reminderid);
+    if (!message) {
+      setToast({ open: true, message: "No message record found for this reminder", severity: "error" });
+      return;
+    }
+
+    setEditImageMessage({
+      ...message,
+      imageUrl: message.attachmenturl || message.attachmentUrl || "",
+      imageFileName: message.attachmentfilename || message.attachmentFileName || "",
+      imageMimeType: message.attachmentmimetype || message.attachmentMimeType || "",
+      messageBody: message.messagebody || message.messageBody || "",
+    });
+    setEditImagePreviewUrl(message.attachmenturl || message.attachmentUrl || getReminderDefaultImageUrl(reminder.reminderid));
+    setEditImageOpen(true);
+  }
+
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
-
-        <input
-          id="reminders-import-input"
-          type="file"
-          accept=".csv,.txt,.xls,.xlsx"
-          style={{ display: 'none' }}
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            try {
-              const text = await file.text();
-              const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-              setToast({ open: true, message: `Import received: ${lines.length-1} rows`, severity: 'success' });
-              (e.target as HTMLInputElement).value = '';
-            } catch (err:any) {
-              setToast({ open: true, message: 'Failed to read file', severity: 'error' });
-            }
-          }}
-        />
-        <label htmlFor="reminders-import-input">
-          <Button component="span" variant="contained">Import</Button>
-        </label>
-      </Box>
-
+    
       <Typography variant="h4" gutterBottom>
         Reminders
       </Typography>
 
+      <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+        This screen shows the birthday reminder schedule and the associated message draft, including channel, template, and attachments.
+      </Typography>
+      
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
+        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+      </Box>
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>
           {error}
         </Typography>
       )}
 
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'nowrap' }}>
+        <FormControl size="small" sx={{ minWidth: 96, flexShrink: 0 }}>
           <InputLabel id="rows-per-page-label">Rows</InputLabel>
           <Select
             labelId="rows-per-page-label"
@@ -233,22 +296,35 @@ export default function RemindersPage() {
           </Select>
         </FormControl>
 
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <Button color="error" disabled={selectedIds.length===0} onClick={()=>setConfirmBulkOpen(true)}>
-            Delete Selected ({selectedIds.length})
-          </Button>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="reminders-pk-filter">Primary Key</InputLabel>
-            <Select labelId="reminders-pk-filter" value={pkFilter} label="Primary Key" onChange={(e)=>{const v = e.target.value as unknown as string; setPkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto', flex: 1, minWidth: 0 }}>
+          <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
+            <InputLabel id="reminders-first-name-filter">First Name</InputLabel>
+            <Select
+              labelId="reminders-first-name-filter"
+              value={firstNameFilter}
+              label="First Name"
+              onChange={(e) => setFirstNameFilter(String(e.target.value))}
+              sx={{ color: '#000', backgroundColor: '#fff' }}
+            >
               <MenuItem value="">All</MenuItem>
-              {reminders.map(r => <MenuItem key={r.reminderid} value={r.reminderid}>{String(r.reminderid)}</MenuItem>)}
+              {[...new Set(reminders.map((r) => r.firstname).filter(Boolean))].map((name) => (
+                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="reminders-fk-filter">Foreign Key (companyId)</InputLabel>
-            <Select labelId="reminders-fk-filter" value={fkFilter} label="Foreign Key (companyId)" onChange={(e)=>{const v = e.target.value as unknown as string; setFkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
+          <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
+            <InputLabel id="reminders-last-name-filter">Last Name</InputLabel>
+            <Select
+              labelId="reminders-last-name-filter"
+              value={lastNameFilter}
+              label="Last Name"
+              onChange={(e) => setLastNameFilter(String(e.target.value))}
+              sx={{ color: '#000', backgroundColor: '#fff' }}
+            >
               <MenuItem value="">All</MenuItem>
-              {[...new Set(reminders.map(r => r.companyid))].map(cid => <MenuItem key={cid} value={cid}>{String(cid)}</MenuItem>)}
+              {[...new Set(reminders.map((r) => r.lastname).filter(Boolean))].map((name) => (
+                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Box>
@@ -261,10 +337,27 @@ export default function RemindersPage() {
             loadReminders(value);
           }}
           sx={{
-            '& .MuiPaginationItem-root': { color: '#000', backgroundColor: '#fff' },
-            '& .Mui-selected': { backgroundColor: '#1976d2 !important', color: '#fff' },
-            boxShadow: 1,
-            borderRadius: 1,
+            '& .MuiPagination-ul': {
+              gap: 0.5,
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              border: '1px solid rgba(17,24,39,0.12)',
+              borderRadius: 999,
+              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.12)',
+              px: 1,
+              py: 0.75,
+            },
+            '& .MuiPaginationItem-root': {
+              color: '#1f2937',
+              fontWeight: 700,
+            },
+            '& .MuiPaginationItem-previousNext, & .MuiPaginationItem-icon': {
+              color: '#1f2937',
+            },
+            '& .Mui-selected': {
+              backgroundColor: `${paginationSelectedColor} !important`,
+              color: '#fff !important',
+            },
           }}
           showFirstButton
           showLastButton
@@ -285,25 +378,24 @@ export default function RemindersPage() {
                   }}
                 />
               </TableCell>
-              <TableCell>Event ID</TableCell>
-              <TableCell>Company ID</TableCell>
-              <TableCell>Reminder Time</TableCell>
-              <TableCell>Method</TableCell>
+              <TableCell>Client Name</TableCell>
+              <TableCell>Birthday Date</TableCell>
+              <TableCell>Schedule Date</TableCell>
+              <TableCell>Channel</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
             {reminders
-              .filter((r) => (pkFilter === "" ? true : r.reminderid === pkFilter))
-              .filter((r) => (fkFilter === "" ? true : r.companyid === fkFilter))
+              .filter((r) => (firstNameFilter === "" ? true : String(r.firstname || "") === firstNameFilter))
+              .filter((r) => (lastNameFilter === "" ? true : String(r.lastname || "") === lastNameFilter))
               .map((reminder) => (
               <TableRow
                 key={reminder.reminderid}
                 hover
                 selected={editingReminder?.reminderid === reminder.reminderid}
-                onClick={() => router.push(`/reminders/${reminder.reminderid}`)}
+                onDoubleClick={() => handlePreview(reminder)}
                 sx={{
                   cursor: "pointer",
                   "&.Mui-selected": {
@@ -321,441 +413,89 @@ export default function RemindersPage() {
                     }}
                   />
                 </TableCell>
-                <TableCell>{reminder.eventid}</TableCell>
-                <TableCell>{reminder.companyid}</TableCell>
-                <TableCell>{formatDate(reminder.reminderdatetime)}</TableCell>
-                <TableCell>{reminder.remindermethod}</TableCell>
+                <TableCell>{[reminder.firstname, reminder.lastname].filter(Boolean).join(" ") || `Client ${reminder.clientid}`}</TableCell>
+                <TableCell>{formatDate(reminder.birthdate)}</TableCell>
+                <TableCell>{formatSendDateTime(reminder.nextrunat, reminder.sendtime)}</TableCell>
+                <TableCell>{getReminderMessage(reminder.reminderid)?.channel || "Email"}</TableCell>
                 <TableCell>{reminder.status}</TableCell>
-
-                <TableCell align="right">
-                  <Button
-                    color="error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!window.confirm("Are you sure you want to delete this reminder?")) {
-                        return;
-                      }
-                      handleDelete(reminder.reminderid);
-                    }}
-                  >
-                    Delete
-                  </Button>
-
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingReminder(reminder);
-                    }}
-                  >
-                    Edit
-                  </Button>
-
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/reminders/${reminder.reminderid}`);
-                    }}
-                  >
-                    View
-                  </Button>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
 
-      <Dialog open={confirmBulkOpen} onClose={() => setConfirmBulkOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Message Preview</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete {selectedIds.length} selected reminders? This action cannot be undone.</Typography>
+          {previewLoading ? (
+            <Typography>Loading preview...</Typography>
+          ) : previewReminder ? (
+            <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">Reminder</Typography>
+                <Typography><strong>Client ID:</strong> {previewReminder.clientid}</Typography>
+                <Typography><strong>Recipient Email:</strong> {previewReminder.email || "No email on file"}</Typography>
+                <Typography><strong>Birthday Date:</strong> {formatDate(previewReminder.birthdate)}</Typography>
+                <Typography><strong>Schedule Date:</strong> {formatSendDateTime(previewReminder.nextrunat, previewReminder.sendtime)}</Typography>
+                <Typography><strong>Channel:</strong> {getReminderMessage(previewReminder.reminderid)?.channel || "Email"}</Typography>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">Template Output</Typography>
+                <Typography sx={{ mb: 1 }}><strong>Subject:</strong> {previewData?.subject || "No preview available"}</Typography>
+                <Typography sx={{ whiteSpace: 'pre-wrap' }}>{previewData?.body || "Select a message template to preview the message."}</Typography>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">Message Draft</Typography>
+                <Typography><strong>Template:</strong> {previewTemplateId || activeTemplateId || "Default template"}</Typography>
+                <Typography><strong>Template Image:</strong> {getReminderMessage(previewReminder.reminderid)?.attachmentfilename || "Default template image"}</Typography>
+                <Typography><strong>Status:</strong> {getReminderMessage(previewReminder.reminderid)?.status || "Draft"}</Typography>
+                <Button sx={{ mt: 1 }} variant="outlined" onClick={() => openEditImage(previewReminder)}>
+                  View Image
+                </Button>
+              </Paper>
+            </Box>
+          ) : (
+            <Typography>No preview available.</Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmBulkOpen(false)}>Cancel</Button>
-          <Button color="error" onClick={async ()=>{
-            setConfirmBulkOpen(false);
-            const res = await deleteReminders(selectedIds);
-            if ((res as any).error) {
-              setError((res as any).error);
-            } else {
-              setToast({ open: true, message: `Deleted ${res.deleted || selectedIds.length} reminders`, severity: 'success' });
-              setSelectedIds([]);
-              await loadReminders(1);
-            }
-          }}>Delete</Button>
+          <Button onClick={() => setPreviewOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
-      <Typography variant="h6" gutterBottom>
-        Add Reminder
-      </Typography>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(260px, 1fr))' },
-          gap: 2,
-          mb: 4,
-        }}
-      >
-        <TextField
-          label="Event ID"
-          type="number"
-          value={newReminder.eventid}
-          onChange={(e) =>
-            setNewReminder({
-              ...newReminder,
-              eventid: Number(e.target.value),
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Company ID"
-          type="number"
-          value={newReminder.companyid}
-          onChange={(e) =>
-            setNewReminder({
-              ...newReminder,
-              companyid: Number(e.target.value),
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Reminder Time"
-          type="datetime-local"
-          value={newReminder.reminderdatetime}
-          onChange={(e) =>
-            setNewReminder({
-              ...newReminder,
-              reminderdatetime: e.target.value,
-            })
-          }
-          {...dateTimeFieldProps}
-        />
-
-        <TextField
-          label="Reminder Method"
-          value={newReminder.remindermethod}
-          onChange={(e) =>
-            setNewReminder({
-              ...newReminder,
-              remindermethod: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <TextField
-          label="Status"
-          value={newReminder.status}
-          onChange={(e) =>
-            setNewReminder({
-              ...newReminder,
-              status: e.target.value,
-            })
-          }
-          {...textFieldProps}
-        />
-
-        <Box
-          sx={{
-            gridColumn: { xs: '1 / -1', md: '1 / -1' },
-            border: '1px solid rgba(255,255,255,0.16)',
-            borderRadius: 2,
-            p: 2,
-            mt: 1,
-          }}
-        >
-          <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
-            Scheduling Controls
+      <Dialog open={editImageOpen} onClose={() => setEditImageOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>View Reminder Image</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+            View the default template image used by this reminder.
           </Typography>
-
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: 'repeat(5, minmax(150px, 1fr))' },
-              gap: 2,
-              alignItems: 'center',
-            }}
-          >
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel id="new-reminder-timingtype-label">Timing Type</InputLabel>
-              <Select
-                labelId="new-reminder-timingtype-label"
-                value={newReminder.timingtype}
-                label="Timing Type"
-                onChange={(e) =>
-                  setNewReminder({
-                    ...newReminder,
-                    timingtype: e.target.value,
-                  })
-                }
-                sx={{ color: '#000', backgroundColor: '#fff' }}
-              >
-                <MenuItem value="Before">Before</MenuItem>
-                <MenuItem value="OnDay">On Day</MenuItem>
-                <MenuItem value="After">After</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Timing Value"
-              type="number"
-              value={newReminder.timingvalue}
-              onChange={(e) =>
-                setNewReminder({
-                  ...newReminder,
-                  timingvalue: Number(e.target.value),
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel id="new-reminder-timingunit-label">Timing Unit</InputLabel>
-              <Select
-                labelId="new-reminder-timingunit-label"
-                value={newReminder.timingunit}
-                label="Timing Unit"
-                onChange={(e) =>
-                  setNewReminder({
-                    ...newReminder,
-                    timingunit: e.target.value,
-                  })
-                }
-                sx={{ color: '#000', backgroundColor: '#fff' }}
-              >
-                <MenuItem value="Days">Days</MenuItem>
-                <MenuItem value="Hours">Hours</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Send Time"
-              type="time"
-              value={newReminder.sendtime}
-              onChange={(e) =>
-                setNewReminder({
-                  ...newReminder,
-                  sendtime: e.target.value,
-                })
-              }
-              {...dateTimeFieldProps}
-            />
-
-            <FormControlLabel
-              sx={{ m: 0 }}
-              control={
-                <Switch
-                  checked={newReminder.isactive}
-                  onChange={(e) =>
-                    setNewReminder({
-                      ...newReminder,
-                      isactive: e.target.checked,
-                    })
-                  }
-                />
-              }
-              label="Active"
-            />
-          </Box>
-        </Box>
-
-        <Button variant="contained" onClick={handleAdd}>
-          Add
-        </Button>
-      </Box>
-
-      {editingReminder && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Edit Reminder
-          </Typography>
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(260px, 1fr))' },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Event ID"
-              type="number"
-              value={editingReminder.eventid}
-              onChange={(e) =>
-                setEditingReminder({
-                  ...editingReminder,
-                  eventid: Number(e.target.value),
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <TextField
-              label="Company ID"
-              type="number"
-              value={editingReminder.companyid}
-              onChange={(e) =>
-                setEditingReminder({
-                  ...editingReminder,
-                  companyid: Number(e.target.value),
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <TextField
-              label="Reminder Time"
-              type="datetime-local"
-              value={editingReminder.reminderdatetime}
-              onChange={(e) =>
-                setEditingReminder({
-                  ...editingReminder,
-                  reminderdatetime: e.target.value,
-                })
-              }
-              {...dateTimeFieldProps}
-            />
-
-            <TextField
-              label="Reminder Method"
-              value={editingReminder.remindermethod}
-              onChange={(e) =>
-                setEditingReminder({
-                  ...editingReminder,
-                  remindermethod: e.target.value,
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <TextField
-              label="Status"
-              value={editingReminder.status}
-              onChange={(e) =>
-                setEditingReminder({
-                  ...editingReminder,
-                  status: e.target.value,
-                })
-              }
-              {...textFieldProps}
-            />
-
-            <Box
-              sx={{
-                gridColumn: { xs: '1 / -1', md: '1 / -1' },
-                border: '1px solid rgba(255,255,255,0.16)',
-                borderRadius: 2,
-                p: 2,
-                mt: 1,
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 700 }}>
-                Scheduling Controls
-              </Typography>
-
+          {editImageMessage && getEditImageUrl() && (
+            <Box sx={{ mb: 2 }}>
               <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: 'repeat(5, minmax(150px, 1fr))' },
-                  gap: 2,
-                  alignItems: 'center',
-                }}
-              >
-                <FormControl size="small" sx={{ minWidth: 160 }}>
-                  <InputLabel id="editing-reminder-timingtype-label">Timing Type</InputLabel>
-                  <Select
-                    labelId="editing-reminder-timingtype-label"
-                    value={editingReminder.timingtype ?? "Before"}
-                    label="Timing Type"
-                    onChange={(e) =>
-                      setEditingReminder({
-                        ...editingReminder,
-                        timingtype: e.target.value,
-                      })
-                    }
-                    sx={{ color: '#000', backgroundColor: '#fff' }}
-                  >
-                    <MenuItem value="Before">Before</MenuItem>
-                    <MenuItem value="OnDay">On Day</MenuItem>
-                    <MenuItem value="After">After</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Timing Value"
-                  type="number"
-                  value={editingReminder.timingvalue ?? 1}
-                  onChange={(e) =>
-                    setEditingReminder({
-                      ...editingReminder,
-                      timingvalue: Number(e.target.value),
-                    })
-                  }
-                  {...textFieldProps}
-                />
-
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel id="editing-reminder-timingunit-label">Timing Unit</InputLabel>
-                  <Select
-                    labelId="editing-reminder-timingunit-label"
-                    value={editingReminder.timingunit ?? "Days"}
-                    label="Timing Unit"
-                    onChange={(e) =>
-                      setEditingReminder({
-                        ...editingReminder,
-                        timingunit: e.target.value,
-                      })
-                    }
-                    sx={{ color: '#000', backgroundColor: '#fff' }}
-                  >
-                    <MenuItem value="Days">Days</MenuItem>
-                    <MenuItem value="Hours">Hours</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Send Time"
-                  type="time"
-                  value={editingReminder.sendtime ?? "09:00"}
-                  onChange={(e) =>
-                    setEditingReminder({
-                      ...editingReminder,
-                      sendtime: e.target.value,
-                    })
-                  }
-                  {...dateTimeFieldProps}
-                />
-
-                <FormControlLabel
-                  sx={{ m: 0 }}
-                  control={
-                    <Switch
-                      checked={Boolean(editingReminder.isactive ?? true)}
-                      onChange={(e) =>
-                        setEditingReminder({
-                          ...editingReminder,
-                          isactive: e.target.checked,
-                        })
-                      }
-                    />
-                  }
-                  label="Active"
-                />
-              </Box>
+                component="img"
+                src={getEditImageUrl()}
+                alt="Current reminder image"
+                sx={{ width: "100%", maxWidth: 360, height: "auto", borderRadius: 2, border: "1px solid rgba(0,0,0,0.12)" }}
+              />
             </Box>
+          )}
+          <Typography variant="body2" color="text.secondary">
+            {editImageMessage?.attachmentfilename || "No default image selected yet"}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditImageOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
 
-            <Button variant="contained" onClick={handleUpdate}>
-              Save
-            </Button>
-          </Box>
-        </Box>
-      )}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Reminder Delivery</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Birthday reminders are created automatically when a client is added. The send time and channel are global settings managed from Setup/Security via Reminder Delivery.
+        </Typography>
+      </Paper>
       <Snackbar
         open={toast.open}
         autoHideDuration={3000}
