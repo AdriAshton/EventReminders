@@ -231,6 +231,7 @@ This log is therefore a reconstruction from the current codebase and visible ses
 - Confirmed the scheduler processes due reminders and sends email successfully when the row is actually due.
 - Verified the app builds successfully after the cron and local-time changes.
 - Pushed the changes to the Git remote on branch `feature/audit-2fa-session`.
+- Confirmed the repository was pushed to GitHub and noted the remote move notice to `https://github.com/AdriAshton/EventReminders.git`.
 - Fixed `MessageAudit` delete logging which caused `DELETE /api/messages` to fail due to a foreign-key violation. Added migration `migrations/008_fix_message_audit_delete.sql` to drop legacy FK constraints (`fk_message`, `fk_message_audit_message`) and updated the audit table definitions in the main schema files so deletes no longer fail.
 
 #### Session & auth UX

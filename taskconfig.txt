@@ -1,0 +1,37 @@
+Task Scheduler Settings for Birthday Reminder Test
+
+General
+- Name: Birthday Reminder
+- Run only when user is logged on: selected
+- Run with highest privileges: optional
+
+Trigger
+- Begin the task: On a schedule
+- Settings: Daily
+- Start: choose current date/time
+- Repeat task every: 1 minute (or 5 minutes for a softer test)
+- For a duration of: 1 day
+- Enabled: checked
+
+Action
+- Program/script: C:\Program Files\nodejs\node.exe
+- Add arguments: "C:\Users\adria_dksxacb\OneDrive\Desktop\Event Reminder App\Birthday Reminders\birthday-reminder\scripts\process_recurring_reminders.js"
+- Start in: C:\Users\adria_dksxacb\OneDrive\Desktop\Event Reminder App\Birthday Reminders\birthday-reminder
+
+Conditions
+- Start the task only if the computer is on AC power: optional
+- Wake the computer to run this task: checked for reliable testing
+- Other conditions: leave unchecked for testing
+
+Settings
+- Allow task to be run on demand: checked
+- Run task as soon as possible after a scheduled start is missed: checked
+- If the task fails, restart every: 1 minute, up to 3 times
+- Stop the task if it runs longer than: unchecked
+- If the running task does not end when requested, force it to stop: checked
+- If the task is already running, then the following rule applies: Do not start a new instance
+
+Test command
+- PowerShell: cd "C:\Users\adria_dksxacb\OneDrive\Desktop\Event Reminder App\Birthday Reminders\birthday-reminder"; npm run process-reminders
+
+After testing, restore scripts/process_recurring_reminders.js back to the real reminder runner.
