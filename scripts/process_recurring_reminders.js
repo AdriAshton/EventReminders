@@ -1,32 +1,44 @@
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
 
 dotenv.config({ path: '.env.local' });
 
+const logFilePath = path.join(__dirname, '..', 'logs', 'process_recurring_reminders.log');
+
+function writeLog(message) {
+  fs.mkdirSync(path.dirname(logFilePath), { recursive: true });
+  fs.appendFileSync(logFilePath, `${new Date().toISOString()} ${message}\n`);
+}
+
 async function main() {
   const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-  const secret = process.env.JOB_SECRET;
+  const jobSecret = process.env.JOB_SECRET;
 
-  if (!secret) {
-    throw new Error('JOB_SECRET is required');
+  if (!jobSecret) {
+    throw new Error('JOB_SECRET is not set');
   }
+
+  writeLog(`Starting reminder job against ${appUrl}`);
 
   const response = await fetch(`${appUrl}/api/jobs/process-recurring-reminders`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${secret}`,
+      Authorization: `Bearer ${jobSecret}`,
     },
   });
 
-  const text = await response.text();
+  const bodyText = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Reminder processor failed: ${text}`);
+    writeLog(`Reminder job failed: ${response.status} ${response.statusText} ${bodyText}`);
+    throw new Error(`Reminder job failed: ${response.status} ${response.statusText} ${bodyText}`);
   }
 
-  console.log(text);
+  writeLog(`Reminder job completed: ${bodyText || 'no response body'}`);
 }
 
 main().catch((error) => {
-  console.error(error.message || error);
+  writeLog(`Reminder job error: ${error.message || error}`);
   process.exit(1);
 });

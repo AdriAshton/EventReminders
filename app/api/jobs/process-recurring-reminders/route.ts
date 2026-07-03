@@ -65,6 +65,11 @@ export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization') || '';
   const isHostedCron = req.headers.get('x-vercel-cron') === '1';
 
+  console.log('process-recurring-reminders endpoint hit', {
+    at: new Date().toISOString(),
+    hostedCron: isHostedCron,
+  });
+
   if ((!secret || authHeader !== `Bearer ${secret}`) && !isHostedCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -80,15 +85,31 @@ export async function POST(req: Request) {
        AND r.nextrunat <= NOW()`
   );
 
+  console.log('process-recurring-reminders due reminders', {
+    count: dueResult.rows.length,
+  });
+
   let processed = 0;
 
   for (const row of dueResult.rows) {
     const nextRunAt = row.nextrunat ? new Date(row.nextrunat) : getNextBirthdayRunAt(row.birthdate, row.sendtime);
     if (!nextRunAt) {
+      console.log('process-recurring-reminders skipped reminder', {
+        reminderId: row.reminderid,
+        reason: 'unable to resolve next run time',
+      });
       continue;
     }
     const message = buildBirthdayMessage(row.firstname, row.lastname, row.birthdate);
     const method = String(row.remindermethod || 'email').toLowerCase();
+
+    console.log('process-recurring-reminders sending reminder', {
+      reminderId: row.reminderid,
+      clientId: row.clientid,
+      method,
+      nextRunAt: nextRunAt.toISOString(),
+      recipient: row.email || row.phone || null,
+    });
 
     if (method === 'email') {
       await sendEmail({
@@ -110,7 +131,19 @@ export async function POST(req: Request) {
       [addOneYear(nextRunAt), row.reminderid]
     );
 
+    console.log('process-recurring-reminders reminder completed', {
+      reminderId: row.reminderid,
+    });
+
     processed += 1;
+  }
+
+  if (processed === 0) {
+    console.log('process-recurring-reminders no reminders were sent');
+  } else {
+    console.log('process-recurring-reminders processed reminders', {
+      processed,
+    });
   }
 
   return NextResponse.json({ processed });

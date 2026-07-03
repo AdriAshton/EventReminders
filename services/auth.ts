@@ -25,10 +25,17 @@ export async function login(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
 
-  const data = await res.json();
+  const contentType = res.headers.get("content-type") || "";
+  const responseText = await res.text();
+  const data = contentType.includes("application/json") && responseText
+    ? JSON.parse(responseText)
+    : responseText;
 
   if (!res.ok) {
-    throw new Error(data.error || "Login failed");
+    const message = typeof data === "string"
+      ? data
+      : data?.error || "Login failed";
+    throw new Error(message);
   }
 
   // You’ll typically get back a JWT token here

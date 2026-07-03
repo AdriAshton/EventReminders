@@ -218,6 +218,19 @@ This log is therefore a reconstruction from the current codebase and visible ses
 ### 2026-06-14
 
 #### Audit logging & schema
+
+### 2026-06-30
+
+#### Recurring reminders, cron, and time handling
+
+- Added Vercel Cron configuration in `vercel.json` to run `/api/jobs/process-recurring-reminders` every minute.
+- Added the manual admin trigger route `app/api/jobs/trigger-recurring-reminders/route.ts` and the dashboard button to invoke it.
+- Updated the recurring reminder processor so due reminders are selected from stored `nextrunat` directly.
+- Switched reminder scheduling and display logic to use local time consistently instead of forcing UTC ISO formatting in the UI.
+- Updated the reminders page to display schedule times in local time.
+- Confirmed the scheduler processes due reminders and sends email successfully when the row is actually due.
+- Verified the app builds successfully after the cron and local-time changes.
+- Pushed the changes to the Git remote on branch `feature/audit-2fa-session`.
 - Fixed `MessageAudit` delete logging which caused `DELETE /api/messages` to fail due to a foreign-key violation. Added migration `migrations/008_fix_message_audit_delete.sql` to drop legacy FK constraints (`fk_message`, `fk_message_audit_message`) and updated the audit table definitions in the main schema files so deletes no longer fail.
 
 #### Session & auth UX
