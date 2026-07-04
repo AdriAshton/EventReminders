@@ -86,7 +86,7 @@ export async function GET(req: Request) {
       return NextResponse.json(valuesResult.rows[0] ?? { firstnames: [], lastnames: [], birthdates: [] });
     }
 
-    // support pagination: ?page=1&pageSize=10
+    // support pagination: ?page=1&pageSize=10 add a line
     const page = Number(url.searchParams.get("page") || "1");
     const pageSize = Number(url.searchParams.get("pageSize") || "10");
     const firstname = url.searchParams.get("firstname") || "";
