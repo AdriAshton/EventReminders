@@ -62,9 +62,15 @@ export async function POST(req: Request) {
   }
 
   // ✅ Issue JWT
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    console.error('Missing JWT_SECRET');
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   const token = jwt.sign(
     { userid: user.userid, companyid: user.companyid, roleid: user.roleid, role: user.role, username: user.username },
-    process.env.JWT_SECRET!,
+    jwtSecret,
     { expiresIn: "1h" }
   );
   const response = NextResponse.json({

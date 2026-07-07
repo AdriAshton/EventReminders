@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-06-16
+Last updated: 2026-07-06
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -10,20 +10,29 @@ This file is a best-effort reconstruction of work completed in this project base
 - UI stack installed: React 19, React DOM 19, Material UI, Emotion.
 - Backend/data-related packages installed: `pg`, `bcrypt`, `jsonwebtoken`.
 - TypeScript and ESLint are configured.
+- The app now includes both `app/` routes and legacy `pages/` routes for compatibility.
 - The default `README.md` from `create-next-app` is still present.
 - The project contains app routes for:
+  - `app/api/auth`
+  - `app/api/jobs`
+  - `app/api/messages`
   - `app/clients`
   - `app/companies`
   - `app/dashboard`
   - `app/events`
   - `app/login`
   - `app/reminders`
+  - `app/settings`
+  - `app/signup`
+  - `app/templates`
+  - `app/uploads`
   - `app/users`
 - The project contains API route folders for:
-  - `app/api/auth`
   - `app/api/clients`
   - `app/api/companies`
   - `app/api/events`
+  - `app/api/jobs`
+  - `app/api/messages`
   - `app/api/reminders`
   - `app/api/users`
 - Service files currently present:
@@ -34,6 +43,13 @@ This file is a best-effort reconstruction of work completed in this project base
   - `services/reminderServices.ts`
   - `services/testEndpoints.txt`
   - `services/userService.ts`
+
+## Latest Work Added
+
+- Confirmed and documented the recurring reminders job flow under `app/api/jobs/process-recurring-reminders` and `app/api/jobs/trigger-recurring-reminders`.
+- Confirmed the settings area now includes a dedicated `app/settings/2fa` subpage alongside the main settings screen.
+- Confirmed auth routing now includes `login`, `signup`, `forgot`, and `reset` flows under `app/api/auth` and the matching app pages.
+- Confirmed the messages surface has an API route at `app/api/messages/route.ts` and a matching message list/detail UI under `app/messages`.
 
 ## Verified Installed Packages
 
