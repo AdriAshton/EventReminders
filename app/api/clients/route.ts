@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
-import { getReminderDeliverySettings } from '@/lib/appSettings';
+import { getCompanySettings } from '@/lib/appSettings';
 
 class AuthError extends Error {
   status = 401;
@@ -15,6 +15,11 @@ function verifyToken(req: Request) {
   }
   const token = authHeader.split(" ")[1];
   return jwt.verify(token, process.env.JWT_SECRET!) as any;
+}
+
+function getCompanyId(decoded: any) {
+  const companyId = Number(decoded?.companyid);
+  return Number.isFinite(companyId) && companyId > 0 ? companyId : null;
 }
 
 function handleApiError(err: unknown) {
@@ -62,12 +67,18 @@ const expectedPhoneFormat = "7 to 15 digits, numbers only";
 // GET clients (scoped by companyid)
 export async function GET(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (id) {
       const result = await pool.query(
-        'SELECT * FROM clients WHERE clientid = $1',
-        [Number(id)]
+        'SELECT * FROM clients WHERE clientid = $1 AND companyid = $2',
+        [Number(id), companyId]
       );
       if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
       return NextResponse.json(result.rows[0]);
@@ -79,8 +90,9 @@ export async function GET(req: Request) {
            COALESCE(array_agg(DISTINCT firstname ORDER BY firstname) FILTER (WHERE firstname IS NOT NULL AND firstname <> ''), '{}') AS firstnames,
            COALESCE(array_agg(DISTINCT lastname ORDER BY lastname) FILTER (WHERE lastname IS NOT NULL AND lastname <> ''), '{}') AS lastnames,
            COALESCE(array_agg(DISTINCT to_char(birthdate, 'MM/DD/YYYY') ORDER BY to_char(birthdate, 'MM/DD/YYYY')) FILTER (WHERE birthdate IS NOT NULL), '{}') AS birthdates
-         FROM clients`,
-        []
+         FROM clients
+         WHERE companyid = $1`,
+        [companyId]
       );
 
       return NextResponse.json(valuesResult.rows[0] ?? { firstnames: [], lastnames: [], birthdates: [] });
@@ -94,8 +106,8 @@ export async function GET(req: Request) {
     const birthdate = url.searchParams.get("birthdate") || "";
     const offset = (Math.max(page, 1) - 1) * pageSize;
 
-    const whereClauses: string[] = [];
-    const queryValues: Array<string | number> = [];
+    const whereClauses: string[] = ['companyid = $1'];
+    const queryValues: Array<string | number> = [companyId];
 
     if (firstname) {
       queryValues.push(firstname);
@@ -115,13 +127,13 @@ export async function GET(req: Request) {
     queryValues.push(pageSize, offset);
 
     const dataResult = await pool.query(
-      `SELECT * FROM clients${whereClauses.length ? ` WHERE ${whereClauses.join(" AND ")}` : ""} ORDER BY clientid LIMIT $${queryValues.length - 1} OFFSET $${queryValues.length}`,
-      queryValues
+      `SELECT * FROM clients WHERE ${whereClauses.join(" AND ")} ORDER BY clientid LIMIT $${queryValues.length + 1} OFFSET $${queryValues.length + 2}`,
+      [...queryValues, pageSize, offset]
     );
 
     const countResult = await pool.query(
-      `SELECT COUNT(*)::int as total FROM clients${whereClauses.length ? ` WHERE ${whereClauses.join(" AND ")}` : ""}`,
-      queryValues.slice(0, queryValues.length - 2)
+      `SELECT COUNT(*)::int as total FROM clients WHERE ${whereClauses.join(" AND ")}`,
+      queryValues
     );
 
     return NextResponse.json({ rows: dataResult.rows, total: countResult.rows[0].total });
@@ -133,9 +145,15 @@ export async function GET(req: Request) {
 // POST new client
 export async function POST(req: Request) {
   try {
-    const { firstname, lastname, email, phone, birthdate, companyId } = await req.json();
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
+    const { firstname, lastname, email, phone, birthdate } = await req.json();
     const normalizedPhone = normalizePhone(phone);
-    const normalizedCompanyId = Number(companyId) || 1;
+    const normalizedCompanyId = companyId;
 
     // ✅ Validate firstname
     if (!firstname) return NextResponse.json({ error: "First name is required" }, { status: 400 });
@@ -163,7 +181,7 @@ export async function POST(req: Request) {
     );
 
     const client = result.rows[0];
-    const reminderDelivery = getReminderDeliverySettings();
+    const reminderDelivery = (await getCompanySettings(normalizedCompanyId)).reminderdelivery;
     const reminderDate = getNextBirthdayRunAt(birthdate, reminderDelivery.sendTime);
 
     if (reminderDate) {
@@ -214,9 +232,15 @@ export async function POST(req: Request) {
 // PUT update client
 export async function PUT(req: Request) {
   try {
-    const { clientid, firstname, lastname, email, phone, birthdate, companyId } = await req.json();
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
+    const { clientid, firstname, lastname, email, phone, birthdate } = await req.json();
     const normalizedPhone = normalizePhone(phone);
-    const normalizedCompanyId = Number(companyId) || 1;
+    const normalizedCompanyId = companyId;
 
     if (!firstname) return NextResponse.json({ error: "First name is required" }, { status: 400 });
     if (!lastname) return NextResponse.json({ error: "Last name is required" }, { status: 400 });
@@ -235,8 +259,8 @@ export async function PUT(req: Request) {
 
     await pool.query(
       `UPDATE clients SET firstname = $1, lastname = $2, email = $3, phone = $4, birthdate = $5, companyid = $6
-       WHERE clientid = $7`,
-      [firstname, lastname, email, normalizedPhone, birthdate, normalizedCompanyId, clientid]
+       WHERE clientid = $7 AND companyid = $8`,
+      [firstname, lastname, email, normalizedPhone, birthdate, normalizedCompanyId, clientid, companyId]
     );
 
     return NextResponse.json({ message: "Client updated successfully" });
@@ -248,12 +272,18 @@ export async function PUT(req: Request) {
 // DELETE client
 export async function DELETE(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const body = await req.json();
     // support single id: { clientid } or bulk: { ids: [1,2,3] }
     if (Array.isArray(body.ids) && body.ids.length > 0) {
       await pool.query(
-        'DELETE FROM clients WHERE clientid = ANY($1::int[])',
-        [body.ids]
+        'DELETE FROM clients WHERE clientid = ANY($1::int[]) AND companyid = $2',
+        [body.ids, companyId]
       );
       return NextResponse.json({ message: 'Clients deleted successfully', deleted: body.ids.length });
     }
@@ -262,8 +292,8 @@ export async function DELETE(req: Request) {
     if (!clientid) return NextResponse.json({ error: 'clientid is required' }, { status: 400 });
 
     await pool.query(
-      'DELETE FROM clients WHERE clientid = $1',
-      [clientid]
+      'DELETE FROM clients WHERE clientid = $1 AND companyid = $2',
+      [clientid, companyId]
     );
 
     return NextResponse.json({ message: 'Client deleted successfully' });

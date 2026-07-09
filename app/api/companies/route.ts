@@ -12,15 +12,24 @@ function verifyToken(req: Request) {
   return jwt.verify(token, process.env.JWT_SECRET!) as any;
 }
 
+function getCompanyId(decoded: any) {
+  const companyId = Number(decoded?.companyid);
+  return Number.isFinite(companyId) && companyId > 0 ? companyId : null;
+}
+
 // ✅ GET companies (scoped by user’s companyid if needed)
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
-    const role = String(decoded.role || "").toLowerCase();
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
 
-    const result = role === "administrator"
-      ? await pool.query("SELECT * FROM companies ORDER BY companyid DESC")
-      : await pool.query("SELECT * FROM companies ORDER BY companyid DESC");
+    const result = await pool.query(
+      "SELECT * FROM companies WHERE companyid = $1 ORDER BY companyid DESC",
+      [companyId]
+    );
 
     return NextResponse.json(result.rows);
   } catch (err: any) {
@@ -31,7 +40,12 @@ export async function GET(req: Request) {
 // ✅ POST new company
 export async function POST(req: Request) {
   try {
-    verifyToken(req); // only admins should be allowed ideally
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const { companyname, contactemail, contactphone } = await req.json();
     const normalizedCompanyName = typeof companyname === "string" ? companyname.trim() : "";
     const normalizedContactEmail = typeof contactemail === "string" ? contactemail.trim() : "";
@@ -55,9 +69,11 @@ export async function POST(req: Request) {
     }
 
     const result = await pool.query(
-      `INSERT INTO companies (companyname, contactemail, contactphone)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone]
+      `UPDATE companies
+       SET companyname = $1, contactemail = $2, contactphone = $3, updatedat = NOW()
+       WHERE companyid = $4
+       RETURNING *`,
+      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone, companyId]
     );
 
     return NextResponse.json(result.rows[0], { status: 201 });
@@ -73,7 +89,11 @@ export async function POST(req: Request) {
 // ✅ PUT update company
 export async function PUT(req: Request) {
   try {
-    verifyToken(req);
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
     const { companyid, companyname, contactemail, contactphone } = await req.json();
     const normalizedCompanyName = typeof companyname === "string" ? companyname.trim() : "";
     const normalizedContactEmail = typeof contactemail === "string" ? contactemail.trim() : "";
@@ -99,7 +119,7 @@ export async function PUT(req: Request) {
       `UPDATE companies
        SET companyname = $1, contactemail = $2, contactphone = $3, updatedat = NOW()
        WHERE companyid = $4`,
-      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone, companyid]
+      [normalizedCompanyName, normalizedContactEmail, normalizedContactPhone, companyId]
     );
 
     return NextResponse.json({ message: "Company updated successfully" });
@@ -115,10 +135,13 @@ export async function PUT(req: Request) {
 // ✅ DELETE company
 export async function DELETE(req: Request) {
   try {
-    verifyToken(req);
-    const { companyid } = await req.json();
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
 
-    await pool.query("DELETE FROM companies WHERE companyid = $1", [companyid]);
+    await pool.query("DELETE FROM companies WHERE companyid = $1", [companyId]);
 
     return NextResponse.json({ message: "Company deleted successfully" });
   } catch (err: any) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
-import { getMessageTemplates } from '@/lib/appSettings';
+import { getCompanySettings } from '@/lib/appSettings';
 import { renderTemplate } from '@/lib/messageTemplates';
 
 function verifyToken(req: Request) {
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Reminder id is required' }, { status: 400 });
     }
 
-    const templates = getMessageTemplates();
+    const templates = (await getCompanySettings(Number(decoded.companyid))).messagetemplates;
     const template = templates.templates.find((item) => item.id === templateId)
       || templates.templates.find((item) => item.id === templates.activeTemplateId)
       || templates.templates[0];
@@ -56,10 +56,10 @@ export async function POST(req: Request) {
 
     const [clientResult, companyResult] = await Promise.all([
       pool.query(
-        'SELECT clientid, firstname, lastname, birthdate FROM clients WHERE clientid = $1',
-        [reminder.clientid],
+        'SELECT clientid, firstname, lastname, birthdate, companyid FROM clients WHERE clientid = $1 AND companyid = $2',
+        [reminder.clientid, decoded.companyid],
       ),
-      pool.query('SELECT companyid, companyname, contactemail, contactphone FROM companies ORDER BY companyid ASC LIMIT 1'),
+      pool.query('SELECT companyid, companyname, contactemail, contactphone FROM companies WHERE companyid = $1 LIMIT 1', [decoded.companyid]),
     ]);
 
     if (clientResult.rows.length === 0) {

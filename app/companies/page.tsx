@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useRouter } from "next/navigation";
+import { getStoredToken, isTokenExpired } from "@/lib/authClient";
 
 import {
   getCompanies,
@@ -43,13 +44,29 @@ export default function CompaniesPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
   );
 
   useEffect(() => {
-    loadCompanies();
+    setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) {
+      return;
+    }
+
+    const token = getStoredToken();
+    if (!token || isTokenExpired(token)) {
+      setError("Session expired. Please log in again.");
+      router.replace("/login");
+      return;
+    }
+
+    loadCompanies();
+  }, [mounted, router]);
 
   async function loadCompanies() {
     const data = await getCompanies();

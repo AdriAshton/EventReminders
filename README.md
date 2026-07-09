@@ -62,6 +62,10 @@ The app exposes a protected endpoint for processing yearly birthday reminders:
 
 `POST /api/jobs/process-recurring-reminders`
 
+The Vercel Cron entry point is:
+
+`GET /api/cron/send-reminders`
+
 Add this to your environment:
 
 ```env
@@ -86,8 +90,8 @@ If you are running the app on a hosted URL, the script will call that URL throug
 
 The app is already configured for Vercel Cron in `vercel.json`:
 
-- Path: `/api/jobs/process-recurring-reminders`
-- Schedule: `* * * * *` (every minute)
+- Path: `/api/cron/send-reminders`
+- Schedule: `0 12 * * *` (daily at 12:00 UTC)
 
 To use it in production:
 
@@ -96,4 +100,6 @@ To use it in production:
 3. Set `JOB_SECRET` in Vercel Environment Variables.
 4. Keep `vercel.json` committed so Vercel registers the cron route.
 
-The cron request is accepted either by the shared `JOB_SECRET` header or by Vercel's `x-vercel-cron` header.
+The cron request is accepted by the Vercel cron entrypoint and then forwards to the protected job endpoint using `JOB_SECRET`.
+
+If you want the job to run more often, update `vercel.json` and redeploy.

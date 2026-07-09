@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { sendEmail } from '@/lib/email';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  return POST(req);
+}
+
 function envValue(name: string) {
   const value = process.env[name];
   return typeof value === 'string' ? value.trim() : value;

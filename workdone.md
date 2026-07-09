@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -50,6 +50,12 @@ This file is a best-effort reconstruction of work completed in this project base
 - Confirmed the settings area now includes a dedicated `app/settings/2fa` subpage alongside the main settings screen.
 - Confirmed auth routing now includes `login`, `signup`, `forgot`, and `reset` flows under `app/api/auth` and the matching app pages.
 - Confirmed the messages surface has an API route at `app/api/messages/route.ts` and a matching message list/detail UI under `app/messages`.
+- Added a company onboarding doc at `COMPANY_ONBOARDING.md` describing the owner / invite / setup flow in one place.
+- Added a dedicated invite screen at `app/users/invites/page.tsx` and linked it from the dashboard setup card.
+- Added `services/companyInviteService.ts` to call the invite API from the UI.
+- Added a bootstrap SQL file and script for the invite tables: `migrations/016_bootstrap_company_invites.sql` and `scripts/bootstrap_company_invites.js`.
+- Successfully connected to the configured Neon database via `DATABASE_URL` and created the missing `company_invites` / `company_onboarding_profiles` tables with the bootstrap script.
+- Fixed the `/signup` page TypeScript and App Router suspense issue so `npm run build` completes successfully.
 
 ## Verified Installed Packages
 
@@ -78,6 +84,27 @@ From `package.json`:
 - `eslint-config-next`
 - `tailwindcss`
 - `typescript`
+
+## Software Tools Used
+
+The application was built with these verified tools and services:
+
+- Next.js 16 with the App Router and legacy `pages/` support.
+- React 19 and React DOM 19.
+- TypeScript and ESLint.
+- Material UI and Emotion for the UI layer.
+- Neon PostgreSQL via the `pg` client.
+- JWT authentication via `jsonwebtoken`.
+- Password hashing via `bcrypt`.
+- Email tooling via `nodemailer` and `@sendgrid/mail`.
+- Spreadsheet import support via `xlsx`.
+- Image processing support via `sharp`.
+- TOTP/2FA support via `speakeasy`.
+- File watching for rebuilds via `chokidar-cli`.
+- Local environment loading via `dotenv`.
+- Vercel for deployment and build hosting.
+- Migration and reminder runner scripts in `scripts/run_migrations.js` and `scripts/process_recurring_reminders.js`.
+- Development and validation commands observed in this session: `npm install`, `npm run start`, `npm run build`, `npm run lint`, and `npx tsc --noEmit`.
 
 ## Verified Terminal Commands Observed In This Session
 
@@ -131,12 +158,19 @@ From `git status --short` inside the project:
 - `app/api/companies/` exists.
 - `services/CompanyService.ts` exists.
 - This strongly indicates company CRUD or lookup work has started.
+- The invite workflow now includes `app/api/company-invites/route.ts` and a UI entry at `app/users/invites/page.tsx`.
+- The dashboard now includes a `Send Invite` button that points to `/users/invites`.
 
 ### Events and Reminders
 - `services/eventService.ts` and `services/reminderServices.ts` are modified.
 - API folders for `events` and `reminders` exist.
 - App pages for `events` and `reminders` exist.
 - This indicates event/reminder flows are in active development.
+
+### Onboarding and invite database support
+- Added `company_invites` and `company_onboarding_profiles` support through `migrations/016_bootstrap_company_invites.sql`.
+- Added a one-off database bootstrap script at `scripts/bootstrap_company_invites.js` to apply the new invite tables directly against `DATABASE_URL`.
+
 
 ### Users
 - `app/api/users/` exists.
@@ -236,6 +270,14 @@ This log is therefore a reconstruction from the current codebase and visible ses
 #### Audit logging & schema
 
 ### 2026-06-30
+
+### 2026-07-07
+- Added the company onboarding document `COMPANY_ONBOARDING.md` with a step-by-step outline of the owner / invite / account setup flow.
+- Added an admin invite screen at `app/users/invites/page.tsx` and a dashboard shortcut in `app/dashboard/page.tsx`.
+- Added invite API support in `app/api/company-invites/route.ts` plus a UI service helper in `services/companyInviteService.ts`.
+- Added `migrations/016_bootstrap_company_invites.sql` and `scripts/bootstrap_company_invites.js` to create the missing invite/onboarding tables directly in the database.
+- Ran the bootstrap script successfully against the configured Neon database, which created `company_invites`.
+- Fixed the `/signup` page suspense / TypeScript issue and verified `npm run build` passes.
 
 #### Recurring reminders, cron, and time handling
 

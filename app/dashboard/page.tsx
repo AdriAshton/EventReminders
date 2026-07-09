@@ -336,11 +336,14 @@ export default function Dashboard() {
                 </Box>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>Company settings and user management</Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                  <Button href="/companies" variant="contained">
+                  <Button variant="contained" onClick={() => router.push('/companies')}>
                     Companies
                   </Button>
-                  <Button href="/users" variant="outlined">
+                  <Button variant="outlined" onClick={() => router.push('/users')}>
                     Users
+                  </Button>
+                  <Button variant="outlined" onClick={() => router.push('/users/invites')}>
+                    Send Invite
                   </Button>
                   <Button variant="outlined" onClick={() => router.push('/settings/email')}>
                     Email Provider

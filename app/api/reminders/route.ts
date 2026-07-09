@@ -13,6 +13,11 @@ function verifyToken(req: Request) {
   return jwt.verify(token, process.env.JWT_SECRET!) as any;
 }
 
+function getCompanyId(decoded: any) {
+  const companyId = Number(decoded?.companyid);
+  return Number.isFinite(companyId) && companyId > 0 ? companyId : null;
+}
+
 function envValue(name: string) {
   const value = process.env[name];
   return typeof value === 'string' ? value.trim() : value;
@@ -161,6 +166,12 @@ async function sendReminderSmsOrWhatsApp(clientid: number, reminderdatetime: str
 
 export async function GET(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (id) {
@@ -168,8 +179,8 @@ export async function GET(req: Request) {
         `SELECT r.*, c.firstname, c.lastname, c.birthdate, c.email
          FROM reminders r
          JOIN clients c ON c.clientid = r.clientid
-         WHERE r.reminderid = $1`,
-        [Number(id)]
+         WHERE r.reminderid = $1 AND r.companyid = $2`,
+        [Number(id), companyId]
       );
       if (result.rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
       return NextResponse.json(normalizeReminderRow(result.rows[0]));
@@ -184,14 +195,15 @@ export async function GET(req: Request) {
       `SELECT r.*, c.firstname, c.lastname, c.birthdate, c.email
        FROM reminders r
        JOIN clients c ON c.clientid = r.clientid
+       WHERE r.companyid = $1
        ORDER BY r.reminderid
-       LIMIT $1 OFFSET $2`,
-      [pageSize, offset]
+       LIMIT $2 OFFSET $3`,
+      [companyId, pageSize, offset]
     );
 
     const countResult = await pool.query(
-      'SELECT COUNT(*)::int as total FROM reminders',
-      []
+      'SELECT COUNT(*)::int as total FROM reminders WHERE companyid = $1',
+      [companyId]
     );
 
     return NextResponse.json({
@@ -206,6 +218,12 @@ export async function GET(req: Request) {
 // POST new reminder
 export async function POST(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const { clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
     const recipient = await getReminderRecipient(Number(clientid));
@@ -246,7 +264,7 @@ export async function POST(req: Request) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         clientid,
-        recipient?.companyid || 1,
+        companyId,
         scheduledAt,
         method,
         status || "Pending",
@@ -265,6 +283,12 @@ export async function POST(req: Request) {
 // PUT update reminder
 export async function PUT(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const { reminderid, clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
     const recipient = await getReminderRecipient(Number(clientid));
@@ -302,7 +326,7 @@ export async function PUT(req: Request) {
     await pool.query(
       `UPDATE reminders 
        SET clientid = $1, reminderdatetime = $2, remindermethod = $3, status = $4, sendtime = $5, isactive = $6, nextrunat = $7
-       WHERE reminderid = $8`,
+       WHERE reminderid = $8 AND companyid = $9`,
       [
         clientid,
         scheduledAt,
@@ -312,6 +336,7 @@ export async function PUT(req: Request) {
         isactive ?? true,
         scheduledAt,
         reminderid,
+        companyId,
       ]
     );
 
@@ -331,12 +356,18 @@ export async function PUT(req: Request) {
 // DELETE reminder
 export async function DELETE(req: Request) {
   try {
+    const decoded = verifyToken(req);
+    const companyId = getCompanyId(decoded);
+    if (!companyId) {
+      return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+    }
+
     const body = await req.json();
     // support bulk delete: { ids: [1,2,3] } or single { reminderid }
     if (Array.isArray(body.ids) && body.ids.length > 0) {
       await pool.query(
-        'DELETE FROM reminders WHERE reminderid = ANY($1::int[])',
-        [body.ids]
+        'DELETE FROM reminders WHERE reminderid = ANY($1::int[]) AND companyid = $2',
+        [body.ids, companyId]
       );
       return NextResponse.json({ message: 'Reminders deleted successfully', deleted: body.ids.length });
     }
@@ -345,8 +376,8 @@ export async function DELETE(req: Request) {
     if (!reminderid) return NextResponse.json({ error: 'reminderid is required' }, { status: 400 });
 
     await pool.query(
-      'DELETE FROM reminders WHERE reminderid = $1',
-      [reminderid]
+      'DELETE FROM reminders WHERE reminderid = $1 AND companyid = $2',
+      [reminderid, companyId]
     );
 
     return NextResponse.json({ message: 'Reminder deleted successfully' });

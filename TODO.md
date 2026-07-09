@@ -8,7 +8,7 @@
 - [x] Settings to toggle between dark mode and 2FA authentication
 - [x] Email integration (SendGrid, Nodemailer) Using mailtrap for now
 - [x] Configurable templates for personalized birthday messages
-- [ ] Messaging integrations (Twilio, SendGrid, Firebase)
+- [x] Messaging integrations (Twilio, SendGrid, Firebase)
 - [x] Redirect when token expires
 
 ## Notes
@@ -17,8 +17,11 @@
 - For email/SMS integrations, store provider config in environment vars and admin settings.
 - Prioritize: security (password reset, 2FA) and messaging integrations.
 
+-2fa should be in a seperate table
 
 Confirm passwords when forgetting
+
+Tie everything up with the reminders and Vercel Cron scheduling
 
 SendGrid: has a free tier for low-volume testing (suitable for dev). Easy to set up and integrate.
 Mailgun: offers a free trial/low-volume tier (limits and credit-based plans change often).

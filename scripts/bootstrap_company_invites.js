@@ -4,8 +4,8 @@ const { Client } = require('pg');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.DATABASE_URL;
+const SQL_FILE = path.join(__dirname, '..', 'migrations', '016_bootstrap_company_invites.sql');
 
 if (!DATABASE_URL) {
   console.error('Set DATABASE_URL environment variable (e.g. postgres://user:pass@host:port/db)');
@@ -17,25 +17,12 @@ async function run() {
   await client.connect();
 
   try {
-    const files = fs.readdirSync(MIGRATIONS_DIR)
-      .filter(f => f.endsWith('.sql'))
-      .sort();
-
-    for (const file of files) {
-      const full = path.join(MIGRATIONS_DIR, file);
-      console.log('Running:', file);
-      const sql = fs.readFileSync(full, 'utf8');
-      try {
-        await client.query(sql);
-      } catch (err) {
-        console.error(`Migration ${file} failed:`, err.message);
-        throw err;
-      }
-    }
-
-    console.log('Migrations completed successfully.');
+    const sql = fs.readFileSync(SQL_FILE, 'utf8');
+    console.log('Running:', path.basename(SQL_FILE));
+    await client.query(sql);
+    console.log('Bootstrap completed successfully.');
   } catch (err) {
-    console.error('Migration failed:', err.message);
+    console.error('Bootstrap failed:', err.message);
     process.exitCode = 1;
   } finally {
     await client.end();

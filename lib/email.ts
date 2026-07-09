@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import sendgrid from '@sendgrid/mail';
-import { getEmailSettings } from '@/lib/appSettings';
+import { getCompanySettings } from '@/lib/appSettings';
 
 type MailTransport = ReturnType<typeof nodemailer.createTransport>;
 
@@ -52,10 +52,10 @@ async function sendByTransport(payload: EmailPayload, transport: MailTransport) 
   });
 }
 
-export async function sendEmail(payload: EmailPayload) {
-  const emailSettings = getEmailSettings();
+export async function sendEmail(payload: EmailPayload, companyId?: number) {
+  const emailSettings = companyId ? (await getCompanySettings(companyId)).emailprovider : 'mailtrap';
 
-  if (emailSettings.provider === 'gmail') {
+  if (emailSettings === 'gmail') {
     if (!envValue('GMAIL_USER') || !envValue('GMAIL_PASS')) {
       throw new Error('Gmail credentials are not configured');
     }

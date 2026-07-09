@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import speakeasy from 'speakeasy';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();

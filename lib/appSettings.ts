@@ -1,7 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const FILE = path.resolve(process.cwd(), 'app_settings.json');
+import pool from '@/lib/db';
 
 export type MessageTemplate = {
   id: string;
@@ -25,10 +22,19 @@ export type ReminderDeliverySettings = {
 };
 
 export type AppSettings = {
-  twoFactorGlobal: boolean;
   email: EmailSettings;
   reminderDelivery: ReminderDeliverySettings;
   messageTemplates: {
+    activeTemplateId: string;
+    templates: MessageTemplate[];
+  };
+};
+
+export type CompanySettingsRecord = {
+  companyid: number;
+  emailprovider: EmailProvider;
+  reminderdelivery: ReminderDeliverySettings;
+  messagetemplates: {
     activeTemplateId: string;
     templates: MessageTemplate[];
   };
@@ -54,30 +60,6 @@ type RawTemplateCollection = {
   templates?: unknown;
   birthdayDefault?: RawTemplateShape;
 };
-
-type RawSettingsShape = {
-  email?: unknown;
-  reminderDelivery?: unknown;
-  messageTemplates?: RawTemplateCollection;
-  twoFactorGlobal?: unknown;
-};
-
-function getDefaultSettings(): AppSettings {
-  return {
-    twoFactorGlobal: false,
-    email: {
-      provider: 'mailtrap' as EmailProvider,
-    },
-    reminderDelivery: {
-      sendTime: '09:00',
-      channel: 'Email',
-    },
-    messageTemplates: {
-      activeTemplateId: DEFAULT_TEMPLATE.id,
-      templates: [DEFAULT_TEMPLATE],
-    },
-  };
-}
 
 function normalizeEmailSettings(rawEmail: unknown): EmailSettings {
   const candidate = typeof rawEmail === 'object' && rawEmail !== null ? rawEmail as { provider?: unknown } : {};
@@ -139,105 +121,57 @@ function normalizeTemplates(rawTemplates: RawTemplateCollection | undefined): { 
   };
 }
 
-export function readSettings(): AppSettings {
-  try {
-    if (!fs.existsSync(FILE)) {
-      fs.writeFileSync(FILE, JSON.stringify(getDefaultSettings(), null, 2));
-    }
-    const raw = fs.readFileSync(FILE, 'utf8');
-    const parsed = JSON.parse(raw || '{}') as RawSettingsShape;
-    const templates = normalizeTemplates(parsed?.messageTemplates);
-    const email = normalizeEmailSettings(parsed?.email);
-    const reminderDelivery = normalizeReminderDelivery(parsed?.reminderDelivery);
-    const twoFactorGlobal = parsed?.twoFactorGlobal === true;
-    return {
-      ...getDefaultSettings(),
-      ...parsed,
-      twoFactorGlobal,
-      email,
-      reminderDelivery,
-      messageTemplates: templates,
-    };
-  } catch {
-    return getDefaultSettings();
-  }
+function normalizeCompanySettingsRow(row: any): CompanySettingsRecord {
+  return {
+    companyid: Number(row.companyid),
+    emailprovider: row.emailprovider === 'gmail' ? 'gmail' : 'mailtrap',
+    reminderdelivery: normalizeReminderDelivery(row.reminderdelivery ?? null),
+    messagetemplates: normalizeTemplates(row.messagetemplates ?? null),
+  };
 }
 
-export function writeSettings(obj: unknown) {
-  fs.writeFileSync(FILE, JSON.stringify(obj, null, 2));
-}
+export async function getCompanySettings(companyId: number) {
+  const result = await pool.query(
+    `SELECT companyid, emailprovider, reminderdelivery, messagetemplates
+     FROM company_settings
+     WHERE companyid = $1
+     LIMIT 1`,
+    [companyId]
+  );
 
-export function getMessageTemplates() {
-  const settings = readSettings();
-  return settings.messageTemplates as { activeTemplateId: string; templates: MessageTemplate[] };
-}
-
-export function upsertMessageTemplate(template: MessageTemplate) {
-  const settings = readSettings();
-  const messageTemplates = getMessageTemplates();
-  const existingIndex = messageTemplates.templates.findIndex((item: MessageTemplate) => item.id === template.id);
-
-  if (existingIndex >= 0) {
-    messageTemplates.templates[existingIndex] = { ...messageTemplates.templates[existingIndex], ...template, imageUrl: template.imageUrl || '' };
-  } else {
-    messageTemplates.templates.push({ ...template, imageUrl: template.imageUrl || '' });
+  if (result.rows[0]) {
+    return normalizeCompanySettingsRow(result.rows[0]);
   }
 
-  if (!messageTemplates.activeTemplateId) {
-    messageTemplates.activeTemplateId = template.id;
-  }
-
-  settings.messageTemplates = messageTemplates;
-  writeSettings(settings);
-  return settings.messageTemplates;
+  return {
+    companyid: companyId,
+    emailprovider: 'mailtrap',
+    reminderdelivery: { sendTime: '09:00', channel: 'Email' },
+    messagetemplates: {
+      activeTemplateId: DEFAULT_TEMPLATE.id,
+      templates: [DEFAULT_TEMPLATE],
+    },
+  } as CompanySettingsRecord;
 }
 
-export function deleteMessageTemplate(templateId: string) {
-  const settings = readSettings();
-  const messageTemplates = getMessageTemplates();
-  messageTemplates.templates = messageTemplates.templates.filter((item: MessageTemplate) => item.id !== templateId);
-  if (messageTemplates.templates.length === 0) {
-    messageTemplates.templates = [DEFAULT_TEMPLATE];
-    messageTemplates.activeTemplateId = DEFAULT_TEMPLATE.id;
-  } else if (messageTemplates.activeTemplateId === templateId) {
-    messageTemplates.activeTemplateId = messageTemplates.templates[0].id;
-  }
-  settings.messageTemplates = messageTemplates;
-  writeSettings(settings);
-  return settings.messageTemplates;
-}
+export async function upsertCompanySettings(companyId: number, partial: Partial<CompanySettingsRecord>) {
+  const current = await getCompanySettings(companyId);
+  const emailProvider = partial.emailprovider || current.emailprovider;
+  const reminderDelivery = partial.reminderdelivery || current.reminderdelivery;
+  const messageTemplates = partial.messagetemplates || current.messagetemplates;
 
-export function setActiveMessageTemplate(templateId: string) {
-  const settings = readSettings();
-  const messageTemplates = getMessageTemplates();
-  if (messageTemplates.templates.some((item: MessageTemplate) => item.id === templateId)) {
-    messageTemplates.activeTemplateId = templateId;
-    settings.messageTemplates = messageTemplates;
-    writeSettings(settings);
-  }
-  return settings.messageTemplates;
-}
+  const result = await pool.query(
+    `INSERT INTO company_settings (companyid, emailprovider, reminderdelivery, messagetemplates)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (companyid)
+     DO UPDATE SET
+       emailprovider = EXCLUDED.emailprovider,
+       reminderdelivery = EXCLUDED.reminderdelivery,
+       messagetemplates = EXCLUDED.messagetemplates,
+       updatedat = NOW()
+     RETURNING companyid, emailprovider, reminderdelivery, messagetemplates`,
+    [companyId, emailProvider, reminderDelivery, messageTemplates]
+  );
 
-export function getEmailSettings(): EmailSettings {
-  const settings = readSettings();
-  return normalizeEmailSettings(settings.email);
-}
-
-export function getReminderDeliverySettings(): ReminderDeliverySettings {
-  const settings = readSettings();
-  return normalizeReminderDelivery(settings.reminderDelivery);
-}
-
-export function setEmailProvider(provider: EmailProvider) {
-  const settings = readSettings();
-  settings.email = normalizeEmailSettings({ provider });
-  writeSettings(settings);
-  return settings.email as EmailSettings;
-}
-
-export function setReminderDeliverySettings(reminderDelivery: ReminderDeliverySettings) {
-  const settings = readSettings();
-  settings.reminderDelivery = normalizeReminderDelivery(reminderDelivery);
-  writeSettings(settings);
-  return settings.reminderDelivery as ReminderDeliverySettings;
+  return normalizeCompanySettingsRow(result.rows[0]);
 }
