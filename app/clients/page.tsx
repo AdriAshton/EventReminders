@@ -133,6 +133,18 @@ export default function ClientsPage() {
     return date.toISOString().slice(0, 10);
   }
 
+  function formatBirthdateDisplay(birthdate: string | null | undefined) {
+    if (!birthdate) return "";
+    const raw = String(birthdate).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toISOString().slice(0, 10);
+  }
+
   function isFutureBirthdate(birthdate: string | null | undefined) {
     if (!birthdate) return false;
     const date = new Date(String(birthdate));
@@ -159,10 +171,40 @@ export default function ClientsPage() {
     const rightText = String(right || "").trim().toLowerCase();
     return leftText.localeCompare(rightText);
   }
+
+  const cascadedClients = clients
+    .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
+    .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
+    .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter));
+
+  const firstNameOptions = [...new Set(
+    clients
+      .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
+      .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
+      .map((c) => String(c.firstname || "").trim())
+      .filter(Boolean)
+  )].sort(compareValues);
+
+  const lastNameOptions = [...new Set(
+    clients
+      .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
+      .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
+      .map((c) => String(c.lastname || "").trim())
+      .filter(Boolean)
+  )].sort(compareValues);
+
+  const birthdateOptions = [...new Set(
+    clients
+      .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
+      .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
+      .map((c) => formatBirthdateDisplay(c.birthdate))
+      .filter(Boolean)
+  )].sort(compareValues);
+
   const sortedClients = [...clients]
     .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
     .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
-    .filter((c) => (birthdateFilter === "" ? true : new Date(c.birthdate).toLocaleDateString() === birthdateFilter))
+    .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
     .sort((left, right) => {
       const firstNameCompare = compareValues(left.firstname, right.firstname);
       const lastNameCompare = compareValues(left.lastname, right.lastname);
@@ -267,6 +309,42 @@ export default function ClientsPage() {
 
   async function handleAdd() {
     setDialogError(null);
+
+    if (!String(newClient.firstname || "").trim()) {
+      const message = "First name is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(newClient.lastname || "").trim()) {
+      const message = "Last name is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(newClient.email || "").trim()) {
+      const message = "Email is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(newClient.phone || "").trim()) {
+      const message = "Phone is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(newClient.birthdate || "").trim()) {
+      const message = "Birthdate is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
     if (isFutureBirthdate(newClient.birthdate)) {
       const message = "Birthdate cannot be in the future";
       setDialogError(message);
@@ -310,6 +388,42 @@ export default function ClientsPage() {
     if (!editingClient) return;
 
     setDialogError(null);
+
+    if (!String(editingClient.firstname || "").trim()) {
+      const message = "First name is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(editingClient.lastname || "").trim()) {
+      const message = "Last name is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(editingClient.email || "").trim()) {
+      const message = "Email is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(editingClient.phone || "").trim()) {
+      const message = "Phone is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
+    if (!String(editingClient.birthdate || "").trim()) {
+      const message = "Birthdate is required";
+      setDialogError(message);
+      setError(message);
+      return;
+    }
+
     if (isFutureBirthdate(editingClient.birthdate)) {
       const message = "Birthdate cannot be in the future";
       setDialogError(message);
@@ -535,7 +649,7 @@ export default function ClientsPage() {
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
-              {filterValues.firstnames.map((name) => (
+              {firstNameOptions.map((name) => (
                 <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
               ))}
             </Select>
@@ -550,7 +664,7 @@ export default function ClientsPage() {
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
-              {filterValues.lastnames.map((name) => (
+              {lastNameOptions.map((name) => (
                 <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
               ))}
             </Select>
@@ -571,7 +685,7 @@ export default function ClientsPage() {
   >
     <MenuItem value="">All</MenuItem>
 
-    {filterValues.birthdates.map((date) => (
+    {birthdateOptions.map((date) => (
         <MenuItem key={date} value={date}>
           {date}
         </MenuItem>
@@ -616,7 +730,7 @@ export default function ClientsPage() {
                 <TableCell>{c.lastname}</TableCell>
                 <TableCell>{maskEmail(c.email)}</TableCell>
                 <TableCell>{maskPhone(c.phone)}</TableCell>
-                <TableCell>{c.birthdate ? new Date(c.birthdate).toLocaleDateString() : ''}</TableCell>
+                <TableCell>{formatBirthdateDisplay(c.birthdate)}</TableCell>
                 <TableCell align="right">
                   <Button color="error" onClick={(e) => { e.stopPropagation(); if (!window.confirm("Are you sure you want to delete this client?")) return; handleDelete(c.clientid); }}>Delete</Button>
                   <Button onClick={(e) => { e.stopPropagation(); setEditingClient(c); }}>View/Edit</Button>
@@ -710,13 +824,14 @@ export default function ClientsPage() {
               </Alert>
             )}
             <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
-              <TextField label="First Name" value={editingClient.firstname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, firstname: e.target.value }); }} {...dialogTextFieldProps} />
-              <TextField label="Last Name" value={editingClient.lastname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, lastname: e.target.value }); }} {...dialogTextFieldProps} />
-              <TextField label="Email" value={editingClient.email} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, email: e.target.value }); }} helperText="Expected format: name@example.com" {...dialogTextFieldProps} />
+              <TextField label="First Name" value={editingClient.firstname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, firstname: e.target.value }); }} required {...dialogTextFieldProps} />
+              <TextField label="Last Name" value={editingClient.lastname} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, lastname: e.target.value }); }} required {...dialogTextFieldProps} />
+              <TextField label="Email" value={editingClient.email} onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, email: e.target.value }); }} helperText="Expected format: name@example.com" required {...dialogTextFieldProps} />
               <TextField
                 label="Phone"
                 value={formatPhoneForEdit(editingClient.phone)}
                 onChange={(e) => { setDialogError(null); setEditingClient({ ...editingClient, phone: normalizePhone(e.target.value) }); }}
+                required
                 {...dialogTextFieldProps}
               />
               <TextField
@@ -801,13 +916,14 @@ export default function ClientsPage() {
             </Alert>
           )}
           <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
-            <TextField label="First Name" value={newClient.firstname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, firstname: e.target.value }); }} {...dialogTextFieldProps} />
-            <TextField label="Last Name" value={newClient.lastname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, lastname: e.target.value }); }} {...dialogTextFieldProps} />
-            <TextField label="Email" value={newClient.email} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, email: e.target.value }); }} helperText="Expected format: name@example.com" {...dialogTextFieldProps} />
+            <TextField label="First Name" value={newClient.firstname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, firstname: e.target.value }); }} required {...dialogTextFieldProps} />
+            <TextField label="Last Name" value={newClient.lastname} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, lastname: e.target.value }); }} required {...dialogTextFieldProps} />
+            <TextField label="Email" value={newClient.email} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, email: e.target.value }); }} helperText="Expected format: name@example.com" required {...dialogTextFieldProps} />
             <TextField
               label="Phone"
               value={formatPhoneForEdit(newClient.phone)}
               onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, phone: normalizePhone(e.target.value) }); }}
+              required
               {...dialogTextFieldProps}
             />
             <TextField label="Birthdate" type="date" value={newClient.birthdate} onChange={(e) => { setDialogError(null); setNewClient({ ...newClient, birthdate: e.target.value }); }} required {...dialogDateFieldProps} />

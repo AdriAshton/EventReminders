@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { getStoredToken, isTokenExpired } from "@/lib/authClient";
+import { getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
 import { getCompanyInvites, sendCompanyInvite } from "@/services/companyInviteService";
 
 const ROLE_OPTIONS = [
@@ -21,15 +21,20 @@ const ROLE_OPTIONS = [
   { roleid: 2, rolename: "Staff" },
 ];
 
+function resolveRoleName(roleid: unknown) {
+  const numericRoleId = Number(roleid);
+  return ROLE_OPTIONS.find((role) => role.roleid === numericRoleId)?.rolename || `Role ${String(roleid || "")}`;
+}
+
 export default function InvitePage() {
   const router = useRouter();
-  const [companyId, setCompanyId] = useState("1");
   const [email, setEmail] = useState("");
   const [roleid, setRoleid] = useState("2");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [invites, setInvites] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [companyId, setCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -45,6 +50,15 @@ export default function InvitePage() {
       router.replace("/login");
       return;
     }
+
+    const payload = getTokenPayload(token);
+    const resolvedCompanyId = Number(payload?.companyid);
+    if (!Number.isFinite(resolvedCompanyId) || resolvedCompanyId <= 0) {
+      setError("Unable to determine your company ID from the current session");
+      return;
+    }
+
+    setCompanyId(resolvedCompanyId);
 
     loadInvites();
   }, [mounted, router]);
@@ -62,13 +76,13 @@ export default function InvitePage() {
     setError("");
     setStatus("");
 
-    if (!companyId.trim() || !email.trim() || !roleid.trim()) {
-      setError("Company, email, and role are required");
+    if (!companyId || !email.trim() || !roleid.trim()) {
+      setError("Email and role are required");
       return;
     }
 
     const res = await sendCompanyInvite({
-      companyid: Number(companyId),
+      companyid: companyId,
       email: email.trim(),
       roleid: Number(roleid),
     });
@@ -85,8 +99,8 @@ export default function InvitePage() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 980, mx: "auto" }}>
-      <Button variant="outlined" onClick={() => router.push("/users")} sx={{ mb: 2 }}>
-        Back to Users
+      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 2 }}>
+        Back
       </Button>
 
       <Typography variant="h4" gutterBottom>
@@ -95,14 +109,7 @@ export default function InvitePage() {
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" } }}>
-            <TextField
-              label="Company ID"
-              type="number"
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-              fullWidth
-            />
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" } }}>
             <TextField
               label="Invite Email"
               type="email"
@@ -148,7 +155,7 @@ export default function InvitePage() {
                 {invite.email}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Company ID: {invite.companyid} | Role ID: {invite.roleid} | Status: {invite.status}
+                Company: {invite.companyname || `Company ${invite.companyid}`} | Role: {resolveRoleName(invite.roleid)} | Status: {invite.status}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Invite Token: {invite.token}

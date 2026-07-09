@@ -53,17 +53,34 @@ async function sendByTransport(payload: EmailPayload, transport: MailTransport) 
 }
 
 export async function sendEmail(payload: EmailPayload, companyId?: number) {
-  const emailSettings = companyId ? (await getCompanySettings(companyId)).emailprovider : 'mailtrap';
+  const companySettings = companyId ? await getCompanySettings(companyId) : null;
+  const emailSettings = companySettings?.emailprovider || 'mailtrap';
 
   if (emailSettings === 'gmail') {
-    if (!envValue('GMAIL_USER') || !envValue('GMAIL_PASS')) {
+    const gmailUser = companySettings?.gmail_user || envValue('GMAIL_USER');
+    const gmailPass = companySettings?.gmail_pass || envValue('GMAIL_PASS');
+    if (!gmailUser || !gmailPass) {
       throw new Error('Gmail credentials are not configured');
     }
-    return sendByTransport(payload, buildGmailTransport());
+    return sendByTransport(payload, nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: gmailUser, pass: gmailPass },
+    }));
   }
 
-  if (envValue('SMTP_HOST') && envValue('SMTP_USER')) {
-    return sendByTransport(payload, buildMailtrapTransport());
+  const smtpHost = companySettings?.smtp_host || envValue('SMTP_HOST');
+  const smtpUser = companySettings?.smtp_user || envValue('SMTP_USER');
+  const smtpPass = companySettings?.smtp_pass || envValue('SMTP_PASS');
+  const smtpPort = companySettings?.smtp_port || Number(envValue('SMTP_PORT') || 587);
+  const smtpSecure = companySettings?.smtp_secure ?? String(envValue('SMTP_SECURE')) === 'true';
+
+  if (smtpHost && smtpUser) {
+    return sendByTransport(payload, nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: { user: smtpUser, pass: smtpPass || '' },
+    }));
   }
 
   if (envValue('SENDGRID_API_KEY')) {

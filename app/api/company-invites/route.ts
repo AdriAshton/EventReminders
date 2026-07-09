@@ -17,8 +17,20 @@ export async function GET(req: Request) {
   try {
     verifyToken(req);
     const result = await pool.query(
-      `SELECT inviteid, companyid, email, roleid, token, status, invitedby, invitedat, acceptedat, expiresat, metadata
-       FROM company_invites
+      `SELECT ci.inviteid,
+            ci.companyid,
+            c.companyname,
+            ci.email,
+            ci.roleid,
+            ci.token,
+            ci.status,
+            ci.invitedby,
+            ci.invitedat,
+            ci.acceptedat,
+            ci.expiresat,
+            ci.metadata
+       FROM company_invites ci
+       LEFT JOIN companies c ON c.companyid = ci.companyid
        ORDER BY inviteid DESC`
     );
     return NextResponse.json(result.rows);

@@ -41,6 +41,11 @@ function getTokenPayload(req: NextRequest) {
   }
 }
 
+function isPrivilegedRole(role: unknown) {
+  const normalized = String(role || "").toLowerCase();
+  return normalized === "administrator" || normalized === "owner";
+}
+
 // ✅ Named export "proxy" function
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -51,7 +56,11 @@ export function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL("/login?reason=expired", req.url));
     }
 
-    if ((pathname.startsWith("/companies") || pathname.startsWith("/users")) && String(payload.role || "").toLowerCase() !== "administrator") {
+    if (pathname.startsWith("/companies") && !isPrivilegedRole(payload.role)) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+
+    if (pathname.startsWith("/users") && !isPrivilegedRole(payload.role)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }

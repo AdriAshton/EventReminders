@@ -33,6 +33,14 @@ export type AppSettings = {
 export type CompanySettingsRecord = {
   companyid: number;
   emailprovider: EmailProvider;
+  emailfrom?: string | null;
+  smtp_host?: string | null;
+  smtp_port?: number | null;
+  smtp_secure?: boolean | null;
+  smtp_user?: string | null;
+  smtp_pass?: string | null;
+  gmail_user?: string | null;
+  gmail_pass?: string | null;
   reminderdelivery: ReminderDeliverySettings;
   messagetemplates: {
     activeTemplateId: string;
@@ -125,6 +133,14 @@ function normalizeCompanySettingsRow(row: any): CompanySettingsRecord {
   return {
     companyid: Number(row.companyid),
     emailprovider: row.emailprovider === 'gmail' ? 'gmail' : 'mailtrap',
+    emailfrom: typeof row.emailfrom === 'string' ? row.emailfrom : null,
+    smtp_host: typeof row.smtp_host === 'string' ? row.smtp_host : null,
+    smtp_port: row.smtp_port === null || row.smtp_port === undefined ? null : Number(row.smtp_port),
+    smtp_secure: typeof row.smtp_secure === 'boolean' ? row.smtp_secure : null,
+    smtp_user: typeof row.smtp_user === 'string' ? row.smtp_user : null,
+    smtp_pass: typeof row.smtp_pass === 'string' ? row.smtp_pass : null,
+    gmail_user: typeof row.gmail_user === 'string' ? row.gmail_user : null,
+    gmail_pass: typeof row.gmail_pass === 'string' ? row.gmail_pass : null,
     reminderdelivery: normalizeReminderDelivery(row.reminderdelivery ?? null),
     messagetemplates: normalizeTemplates(row.messagetemplates ?? null),
   };
@@ -146,6 +162,14 @@ export async function getCompanySettings(companyId: number) {
   return {
     companyid: companyId,
     emailprovider: 'mailtrap',
+    emailfrom: null,
+    smtp_host: null,
+    smtp_port: null,
+    smtp_secure: null,
+    smtp_user: null,
+    smtp_pass: null,
+    gmail_user: null,
+    gmail_pass: null,
     reminderdelivery: { sendTime: '09:00', channel: 'Email' },
     messagetemplates: {
       activeTemplateId: DEFAULT_TEMPLATE.id,
@@ -157,20 +181,39 @@ export async function getCompanySettings(companyId: number) {
 export async function upsertCompanySettings(companyId: number, partial: Partial<CompanySettingsRecord>) {
   const current = await getCompanySettings(companyId);
   const emailProvider = partial.emailprovider || current.emailprovider;
+  const emailfrom = partial.emailfrom ?? current.emailfrom ?? null;
+  const smtp_host = partial.smtp_host ?? current.smtp_host ?? null;
+  const smtp_port = partial.smtp_port ?? current.smtp_port ?? null;
+  const smtp_secure = partial.smtp_secure ?? current.smtp_secure ?? null;
+  const smtp_user = partial.smtp_user ?? current.smtp_user ?? null;
+  const smtp_pass = partial.smtp_pass ?? current.smtp_pass ?? null;
+  const gmail_user = partial.gmail_user ?? current.gmail_user ?? null;
+  const gmail_pass = partial.gmail_pass ?? current.gmail_pass ?? null;
   const reminderDelivery = partial.reminderdelivery || current.reminderdelivery;
   const messageTemplates = partial.messagetemplates || current.messagetemplates;
 
   const result = await pool.query(
-    `INSERT INTO company_settings (companyid, emailprovider, reminderdelivery, messagetemplates)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO company_settings (
+       companyid, emailprovider, emailfrom, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, gmail_user, gmail_pass,
+       reminderdelivery, messagetemplates
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      ON CONFLICT (companyid)
      DO UPDATE SET
        emailprovider = EXCLUDED.emailprovider,
+       emailfrom = EXCLUDED.emailfrom,
+       smtp_host = EXCLUDED.smtp_host,
+       smtp_port = EXCLUDED.smtp_port,
+       smtp_secure = EXCLUDED.smtp_secure,
+       smtp_user = EXCLUDED.smtp_user,
+       smtp_pass = EXCLUDED.smtp_pass,
+       gmail_user = EXCLUDED.gmail_user,
+       gmail_pass = EXCLUDED.gmail_pass,
        reminderdelivery = EXCLUDED.reminderdelivery,
        messagetemplates = EXCLUDED.messagetemplates,
        updatedat = NOW()
-     RETURNING companyid, emailprovider, reminderdelivery, messagetemplates`,
-    [companyId, emailProvider, reminderDelivery, messageTemplates]
+     RETURNING companyid, emailprovider, emailfrom, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, gmail_user, gmail_pass, reminderdelivery, messagetemplates`,
+    [companyId, emailProvider, emailfrom, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, gmail_user, gmail_pass, reminderDelivery, messageTemplates]
   );
 
   return normalizeCompanySettingsRow(result.rows[0]);

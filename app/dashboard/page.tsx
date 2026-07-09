@@ -85,7 +85,8 @@ export default function Dashboard() {
     if (token) {
       const decoded = getTokenPayload(token);
       if (decoded) {
-        setIsAdministrator(String(decoded.role || "").toLowerCase() === "administrator");
+        const role = String(decoded.role || "").toLowerCase();
+        setIsAdministrator(role === "administrator" || role === "owner");
         setUsername(String(decoded.username || ""));
       } else {
         setIsAdministrator(false);

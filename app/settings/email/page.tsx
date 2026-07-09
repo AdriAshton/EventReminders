@@ -9,11 +9,15 @@ import {
   CardActionArea,
   CardContent,
   Chip,
+  FormControlLabel,
   Snackbar,
   Stack,
+  Switch,
+  TextField,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
+import { authenticatedFetch, getStoredToken, getTokenPayload, isTokenExpired } from "@/lib/authClient";
 
 type EmailProvider = "mailtrap" | "gmail";
 
@@ -54,6 +58,15 @@ function ProviderCard(props: {
 export default function EmailSettingsPage() {
   const router = useRouter();
   const [provider, setProvider] = useState<EmailProvider>("mailtrap");
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  const [emailFrom, setEmailFrom] = useState("");
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [gmailUser, setGmailUser] = useState("");
+  const [gmailPass, setGmailPass] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,13 +79,31 @@ export default function EmailSettingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/settings/email-provider");
+        const token = getStoredToken();
+        if (!token || isTokenExpired(token)) {
+          router.replace("/login");
+          return;
+        }
+
+        const payload = getTokenPayload(token);
+        const resolvedCompanyName = String(payload?.companyname || payload?.companyName || "").trim();
+        setCompanyName(resolvedCompanyName || null);
+
+        const res = await authenticatedFetch("/api/settings/email-provider", { method: "GET" });
         const data = await res.json();
         if (!res.ok) {
           setError(data.error || "Failed to load email provider");
           return;
         }
         setProvider(data.provider === "gmail" ? "gmail" : "mailtrap");
+        setEmailFrom(data.emailfrom || "");
+        setSmtpHost(data.smtp_host || "");
+        setSmtpPort(data.smtp_port ? String(data.smtp_port) : "587");
+        setSmtpSecure(Boolean(data.smtp_secure));
+        setSmtpUser(data.smtp_user || "");
+        setSmtpPass(data.smtp_pass || "");
+        setGmailUser(data.gmail_user || "");
+        setGmailPass(data.gmail_pass || "");
       } catch {
         setError("Failed to load email provider");
       } finally {
@@ -85,10 +116,20 @@ export default function EmailSettingsPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/settings/email-provider", {
+      const res = await authenticatedFetch("/api/settings/email-provider", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: nextProvider }),
+        body: JSON.stringify({
+          provider: nextProvider,
+          emailfrom: emailFrom.trim(),
+          smtp_host: smtpHost.trim(),
+          smtp_port: smtpPort ? Number(smtpPort) : null,
+          smtp_secure: smtpSecure,
+          smtp_user: smtpUser.trim(),
+          smtp_pass: smtpPass,
+          gmail_user: gmailUser.trim(),
+          gmail_pass: gmailPass,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -97,6 +138,14 @@ export default function EmailSettingsPage() {
         return;
       }
       setProvider(data.provider);
+      setEmailFrom(data.emailfrom || "");
+      setSmtpHost(data.smtp_host || "");
+      setSmtpPort(data.smtp_port ? String(data.smtp_port) : "587");
+      setSmtpSecure(Boolean(data.smtp_secure));
+      setSmtpUser(data.smtp_user || "");
+      setSmtpPass(data.smtp_pass || "");
+      setGmailUser(data.gmail_user || "");
+      setGmailPass(data.gmail_pass || "");
       setToast({ open: true, message: `Email provider set to ${data.provider}`, severity: "success" });
     } catch {
       setError("Failed to save email provider");
@@ -114,8 +163,13 @@ export default function EmailSettingsPage() {
           <Typography variant="body2" color="text.secondary">
             Choose which SMTP provider the app should use when sending reset, 2FA, and provisioning emails.
           </Typography>
+          {companyName && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Company: {companyName}
+            </Typography>
+          )}
         </Box>
-        <Button variant="outlined" onClick={() => router.push("/settings")}>Back to Settings</Button>
+        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
       </Stack>
 
       {error && (
@@ -145,9 +199,35 @@ export default function EmailSettingsPage() {
         />
       </Stack>
 
-      <Alert severity="info" sx={{ mt: 3 }}>
-        This screen only selects the provider. Credentials still come from environment variables on the server.
-      </Alert>
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>Company Email Credentials</Typography>
+          <Stack spacing={2}>
+            <TextField label="From Email" value={emailFrom} onChange={(e) => setEmailFrom(e.target.value)} fullWidth />
+
+            {provider === "mailtrap" ? (
+              <>
+                <TextField label="SMTP Host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} fullWidth />
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                  <TextField label="SMTP Port" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} fullWidth />
+                  <FormControlLabel control={<Switch checked={smtpSecure} onChange={(e) => setSmtpSecure(e.target.checked)} />} label="Secure" />
+                </Stack>
+                <TextField label="SMTP User" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} fullWidth />
+                <TextField label="SMTP Password" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} fullWidth />
+              </>
+            ) : (
+              <>
+                <TextField label="Gmail / Workspace User" value={gmailUser} onChange={(e) => setGmailUser(e.target.value)} fullWidth />
+                <TextField label="Gmail Password" type="password" value={gmailPass} onChange={(e) => setGmailPass(e.target.value)} fullWidth />
+              </>
+            )}
+          </Stack>
+
+          <Alert severity="info" sx={{ mt: 3 }}>
+            These credentials are saved per company. The selected provider determines which values the mailer uses.
+          </Alert>
+        </CardContent>
+      </Card>
 
       <Snackbar
         open={toast.open}

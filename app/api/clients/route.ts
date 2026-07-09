@@ -124,10 +124,12 @@ export async function GET(req: Request) {
       whereClauses.push(`to_char(birthdate, 'MM/DD/YYYY') = $${queryValues.length}`);
     }
 
-    queryValues.push(pageSize, offset);
-
     const dataResult = await pool.query(
-      `SELECT * FROM clients WHERE ${whereClauses.join(" AND ")} ORDER BY clientid LIMIT $${queryValues.length + 1} OFFSET $${queryValues.length + 2}`,
+      `SELECT * FROM clients
+       WHERE ${whereClauses.join(" AND ")}
+       ORDER BY clientid
+       LIMIT $${queryValues.length + 1}::int
+       OFFSET $${queryValues.length + 2}::int`,
       [...queryValues, pageSize, offset]
     );
 

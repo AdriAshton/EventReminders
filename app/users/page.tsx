@@ -38,7 +38,8 @@ const ROLE_OPTIONS = [
 export default function UsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
-  const [pkFilter, setPkFilter] = useState<number | string>("");
+  const [usernameFilter, setUsernameFilter] = useState("");
+  const [emailFilter, setEmailFilter] = useState("");
   const [fkFilter, setFkFilter] = useState<number | string>("");
   const [newUser, setNewUser] = useState({
     username: "",
@@ -66,6 +67,31 @@ export default function UsersPage() {
       roleid: user.roleid ?? ROLE_OPTIONS.find((role) => role.rolename === user.role)?.roleid ?? ROLE_OPTIONS[1].roleid,
     };
   }
+
+  const usernameOptions = [...new Set(users.map((user) => String(user.username || "").trim()).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right)
+  );
+
+  const emailOptions = [...new Set(users.map((user) => String(user.email || "").trim()).filter(Boolean))].sort((left, right) =>
+    left.localeCompare(right)
+  );
+
+  const filteredUsers = users.filter((user) => (usernameFilter === "" ? true : String(user.username || "") === usernameFilter))
+    .filter((user) => (emailFilter === "" ? true : String(user.email || "") === emailFilter));
+
+  const cascadedUsernameOptions = [...new Set(
+    users
+      .filter((user) => (emailFilter === "" ? true : String(user.email || "") === emailFilter))
+      .map((user) => String(user.username || "").trim())
+      .filter(Boolean)
+  )].sort((left, right) => left.localeCompare(right));
+
+  const cascadedEmailOptions = [...new Set(
+    users
+      .filter((user) => (usernameFilter === "" ? true : String(user.username || "") === usernameFilter))
+      .map((user) => String(user.email || "").trim())
+      .filter(Boolean)
+  )].sort((left, right) => left.localeCompare(right));
 
   async function loadUsers() {
     const data = await getUsers();
@@ -112,6 +138,21 @@ export default function UsersPage() {
     if (!editingUser) return;
 
     setDialogError(null);
+
+    if (!String(editingUser.username || "").trim()) {
+      setDialogError("Username is required");
+      return;
+    }
+
+    if (!String(editingUser.email || "").trim()) {
+      setDialogError("Email is required");
+      return;
+    }
+
+    if (!editingUser.roleid && editingUser.roleid !== 0) {
+      setDialogError("Role is required");
+      return;
+    }
 
     if (isChangingPassword) {
       if (!editingUser.password) {
@@ -181,17 +222,56 @@ export default function UsersPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 2 }}>
-        Back
-      </Button>
+      <Typography variant="h4" gutterBottom sx={{ mb: 1 }}>
+        Users
+      </Typography>
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 2 }}>
-        <Typography variant="h4" gutterBottom sx={{ mb: 0 }}>
-          Users
-        </Typography>
-        <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
-          Add Users
-        </Button>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Button variant="outlined" onClick={() => router.push("/dashboard")}>
+            Back
+          </Button>
+
+          <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
+            Add Users
+          </Button>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="users-username-filter">Username</InputLabel>
+            <Select
+              labelId="users-username-filter"
+              value={usernameFilter}
+              label="Username"
+              onChange={(e) => setUsernameFilter(String(e.target.value))}
+              sx={{ color: "#000", backgroundColor: "#fff" }}
+            >
+              <MenuItem value="">All</MenuItem>
+              {cascadedUsernameOptions.map((username) => (
+                <MenuItem key={username} value={username}>
+                  {username}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel id="users-email-filter">Email</InputLabel>
+            <Select
+              labelId="users-email-filter"
+              value={emailFilter}
+              label="Email"
+              onChange={(e) => setEmailFilter(String(e.target.value))}
+              sx={{ color: "#000", backgroundColor: "#fff" }}
+            >
+              <MenuItem value="">All</MenuItem>
+              {cascadedEmailOptions.map((email) => (
+                <MenuItem key={email} value={email}>
+                  {email}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       {error && (
@@ -199,16 +279,6 @@ export default function UsersPage() {
           {error}
         </Typography>
       )}
-
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="users-pk-filter">Primary Key</InputLabel>
-          <Select labelId="users-pk-filter" value={pkFilter} label="Primary Key" onChange={(e)=>{const v = e.target.value as unknown as string; setPkFilter(v===""?"":Number(v))}} sx={{ color: '#000', backgroundColor: '#fff' }}>
-            <MenuItem value="">All</MenuItem>
-            {users.map(u => <MenuItem key={u.userid} value={u.userid}>{String(u.userid)}</MenuItem>)}
-          </Select>
-        </FormControl>
-      </Box>
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
         <Table>
@@ -222,9 +292,7 @@ export default function UsersPage() {
           </TableHead>
 
           <TableBody>
-            {users
-              .filter((u) => (pkFilter === "" ? true : u.userid === pkFilter))
-              .map((user) => (
+            {filteredUsers.map((user) => (
               <TableRow
                 key={user.userid}
                 hover
@@ -282,9 +350,9 @@ export default function UsersPage() {
         <DialogContent>
           {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
           <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
-            <TextField label="Username" value={newUser.username} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, username: e.target.value }); }} {...dialogTextFieldProps} />
-            <TextField label="Email" value={newUser.email} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, email: e.target.value }); }} {...dialogTextFieldProps} />
-            <FormControl>
+            <TextField label="Username" value={newUser.username} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, username: e.target.value }); }} required {...dialogTextFieldProps} />
+            <TextField label="Email" value={newUser.email} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, email: e.target.value }); }} required {...dialogTextFieldProps} />
+            <FormControl required>
               <InputLabel id="new-user-role-label">Role</InputLabel>
               <Select
                 labelId="new-user-role-label"
@@ -297,7 +365,7 @@ export default function UsersPage() {
                 ))}
               </Select>
             </FormControl>
-            <TextField label="Password" type="password" value={newUser.password} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, password: e.target.value }); }} {...dialogTextFieldProps} />
+            <TextField label="Password" type="password" value={newUser.password} onChange={(e) => { setDialogError(null); setNewUser({ ...newUser, password: e.target.value }); }} required {...dialogTextFieldProps} />
           </Box>
         </DialogContent>
         <DialogActions>
@@ -312,9 +380,9 @@ export default function UsersPage() {
           {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
           {editingUser && (
             <Box sx={{ display: 'flex', gap: 2, pt: 1, flexWrap: 'wrap' }}>
-              <TextField label="Username" value={editingUser.username} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, username: e.target.value }); }} {...dialogTextFieldProps} />
-              <TextField label="Email" value={editingUser.email} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, email: e.target.value }); }} {...dialogTextFieldProps} />
-              <FormControl>
+              <TextField label="Username" value={editingUser.username} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, username: e.target.value }); }} required {...dialogTextFieldProps} />
+              <TextField label="Email" value={editingUser.email} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, email: e.target.value }); }} required {...dialogTextFieldProps} />
+              <FormControl required>
                 <InputLabel id="editing-user-role-label">Role</InputLabel>
                 <Select
                   labelId="editing-user-role-label"
@@ -330,8 +398,8 @@ export default function UsersPage() {
               <Button variant="outlined" onClick={() => setIsChangingPassword((currentValue) => !currentValue)}>Change Password</Button>
               {isChangingPassword && (
                 <>
-                  <TextField label="New Password" type="password" value={editingUser.password ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, password: e.target.value }); }} {...dialogTextFieldProps} />
-                  <TextField label="Confirm Password" type="password" value={editingUser.confirmPassword ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, confirmPassword: e.target.value }); }} {...dialogTextFieldProps} />
+                  <TextField label="New Password" type="password" value={editingUser.password ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, password: e.target.value }); }} required {...dialogTextFieldProps} />
+                  <TextField label="Confirm Password" type="password" value={editingUser.confirmPassword ?? ""} onChange={(e) => { setDialogError(null); setEditingUser({ ...editingUser, confirmPassword: e.target.value }); }} required {...dialogTextFieldProps} />
                 </>
               )}
             </Box>

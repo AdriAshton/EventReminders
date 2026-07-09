@@ -34,6 +34,10 @@ import {
 export default function CompaniesPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<any[]>([]);
+  const [companyNameFilter, setCompanyNameFilter] = useState("");
+  const [canViewCompanies, setCanViewCompanies] = useState(false);
+  const [canManageCompanies, setCanManageCompanies] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [newCompany, setNewCompany] = useState({
     companyname: "",
     contactemail: "",
@@ -41,6 +45,7 @@ export default function CompaniesPage() {
   });
 
   const [editingCompany, setEditingCompany] = useState<any | null>(null);
+  const [viewOnlyCompany, setViewOnlyCompany] = useState<any | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +70,27 @@ export default function CompaniesPage() {
       return;
     }
 
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(token.split('.')[1].length / 4) * 4, '=')));
+      const role = String(payload?.role || "").toLowerCase();
+      const viewAllowed = role === "administrator" || role === "owner";
+      const manageAllowed = role === "owner";
+      setIsOwner(role === "owner");
+      setCanViewCompanies(viewAllowed);
+      setCanManageCompanies(manageAllowed);
+      if (!viewAllowed) {
+        setError("Administrator or Owner access is required.");
+        router.replace("/dashboard");
+        return;
+      }
+    } catch {
+      setCanViewCompanies(false);
+      setCanManageCompanies(false);
+      setError("Administrator or Owner access is required.");
+      router.replace("/dashboard");
+      return;
+    }
+
     loadCompanies();
   }, [mounted, router]);
 
@@ -78,6 +104,21 @@ export default function CompaniesPage() {
       setError(null);
     }
   }
+
+  const filteredCompanies = companies.filter((company) => {
+    const filterText = companyNameFilter.trim().toLowerCase();
+    if (!filterText) {
+      return true;
+    }
+
+    return String(company.companyname || "").toLowerCase().includes(filterText);
+  });
+
+  const companyNameOptions = [...new Set(
+    companies
+      .map((company) => String(company.companyname || "").trim())
+      .filter(Boolean)
+  )].sort((left, right) => left.localeCompare(right));
 
   async function handleAdd() {
     setDialogError(null);
@@ -156,21 +197,37 @@ export default function CompaniesPage() {
       input: {
         sx: {
           color: "#111827",
+          fontWeight: 600,
           "& input": {
             color: "#111827",
+            fontWeight: 600,
             WebkitTextFillColor: "#111827",
           },
         },
       },
       inputLabel: {
         sx: {
-          color: "#4b5563",
-          fontWeight: 600,
+          color: "#111827",
+          fontWeight: 700,
           "&.Mui-focused": {
             color: "#111827",
           },
         },
         shrink: true,
+      },
+    },
+    sx: {
+      "& .MuiOutlinedInput-root": {
+        backgroundColor: "#f8fafc",
+      },
+      "& .MuiOutlinedInput-notchedOutline": {
+        borderColor: "#94a3b8",
+      },
+      "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+        borderColor: "#64748b",
+      },
+      "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+        borderColor: "#111827",
       },
     },
   };
@@ -185,16 +242,32 @@ export default function CompaniesPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
+    <Box sx={{ p: 3, pt: 2 }}>
+      <Typography variant="h4" gutterBottom sx={{ mt: 0.5 }}>
         Companies
       </Typography>
 
-
-    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-         <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
-         <Button variant="contained" onClick={() => setAddDialogOpen(true)}>Add Company</Button>
-    </Box>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+        {canManageCompanies && <Button variant="contained" onClick={() => setAddDialogOpen(true)}>Add Company</Button>}
+        {isOwner && (
+          <FormControl size="small" sx={{ minWidth: 240 }}>
+            <InputLabel>Company Name</InputLabel>
+            <Select
+              value={companyNameFilter}
+              label="Company Name"
+              onChange={(event) => setCompanyNameFilter(event.target.value)}
+            >
+              <MenuItem value="">All Companies</MenuItem>
+              {companyNameOptions.map((name) => (
+                <MenuItem key={name} value={name}>
+                  {name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+      </Box>
 
    
 
@@ -218,13 +291,14 @@ export default function CompaniesPage() {
           </TableHead>
 
           <TableBody>
-            {companies.map((company) => (
+            {filteredCompanies.map((company) => (
               <TableRow
                 key={company.companyid}
                 hover
                 selected={editingCompany?.companyid === company.companyid}
                 onDoubleClick={() => {
-                  setEditingCompany(company);
+                  setViewOnlyCompany(company);
+                  setEditingCompany(null);
                   setDialogError(null);
                 }}
                 sx={{
@@ -241,6 +315,17 @@ export default function CompaniesPage() {
 
                 <TableCell align="right">
                   <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewOnlyCompany(company);
+                      setEditingCompany(null);
+                      setDialogError(null);
+                    }}
+                  >
+                    View
+                  </Button>
+
+                  {canManageCompanies && <Button
                     color="error"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -251,17 +336,19 @@ export default function CompaniesPage() {
                     }}
                   >
                     Delete
-                  </Button>
+                  </Button>}
 
-                  <Button
+                  {canManageCompanies && <Button
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (!isOwner) return;
                       setEditingCompany(company);
+                      setViewOnlyCompany(null);
                       setDialogError(null);
                     }}
                   >
-                    View/Edit
-                  </Button>
+                    Edit
+                  </Button>}
                 </TableCell>
               </TableRow>
             ))}
@@ -307,43 +394,57 @@ export default function CompaniesPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(editingCompany)} onClose={() => { setEditingCompany(null); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
-        <DialogTitle>View/Edit Company</DialogTitle>
+      <Dialog open={Boolean(editingCompany || viewOnlyCompany)} onClose={() => { setEditingCompany(null); setViewOnlyCompany(null); setDialogError(null); }} fullWidth maxWidth="sm" slotProps={{ paper: dialogPaperProps }}>
+        <DialogTitle sx={{ color: "#111827", fontWeight: 800 }}>{viewOnlyCompany ? "View Company" : "Edit Company"}</DialogTitle>
         <DialogContent>
-          {dialogError && (
-            <Typography color="error" sx={{ mb: 2 }}>
+          {!viewOnlyCompany && dialogError && (
+            <Typography color="error" sx={{ mb: 2, fontWeight: 600 }}>
               {dialogError}
             </Typography>
           )}
-          {editingCompany && (
+          {(editingCompany || viewOnlyCompany) && (
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mt: 1 }}>
               <TextField
                 label="Company Name"
-                value={editingCompany.companyname}
-                onChange={(e) => setEditingCompany({ ...editingCompany, companyname: e.target.value })}
+                value={(editingCompany || viewOnlyCompany)?.companyname}
+                onChange={(e) => {
+                  if (!editingCompany) return;
+                  setEditingCompany({ ...editingCompany, companyname: e.target.value });
+                }}
                 required
+                disabled={Boolean(viewOnlyCompany)}
                 {...dialogTextFieldProps}
               />
               <TextField
                 label="Contact Email"
-                value={editingCompany.contactemail ?? ""}
-                onChange={(e) => setEditingCompany({ ...editingCompany, contactemail: e.target.value })}
+                value={(editingCompany || viewOnlyCompany)?.contactemail ?? ""}
+                onChange={(e) => {
+                  if (!editingCompany) return;
+                  setEditingCompany({ ...editingCompany, contactemail: e.target.value });
+                }}
                 required
+                disabled={Boolean(viewOnlyCompany)}
                 {...dialogTextFieldProps}
               />
               <TextField
                 label="Contact Phone"
-                value={editingCompany.contactphone ?? ""}
-                onChange={(e) => setEditingCompany({ ...editingCompany, contactphone: e.target.value })}
+                value={(editingCompany || viewOnlyCompany)?.contactphone ?? ""}
+                onChange={(e) => {
+                  if (!editingCompany) return;
+                  setEditingCompany({ ...editingCompany, contactphone: e.target.value });
+                }}
                 required
+                disabled={Boolean(viewOnlyCompany)}
                 {...dialogTextFieldProps}
               />
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setEditingCompany(null); setDialogError(null); }}>Cancel</Button>
-          <Button variant="contained" onClick={handleUpdate} disabled={!editingCompany}>Save</Button>
+          <Button onClick={() => { setEditingCompany(null); setViewOnlyCompany(null); setDialogError(null); }}>
+            Close
+          </Button>
+          {!viewOnlyCompany && <Button variant="contained" onClick={handleUpdate} disabled={!editingCompany}>Save</Button>}
         </DialogActions>
       </Dialog>
       <Snackbar
