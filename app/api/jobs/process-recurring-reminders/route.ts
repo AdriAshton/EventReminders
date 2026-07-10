@@ -68,90 +68,138 @@ function buildBirthdayMessage(firstname: string, lastname: string, birthdate: st
 }
 
 export async function POST(req: Request) {
-  const secret = envValue('JOB_SECRET');
-  const authHeader = req.headers.get('authorization') || '';
-  const isHostedCron = req.headers.get('x-vercel-cron') === '1';
+  try {
+    const secret = envValue('JOB_SECRET');
+    const authHeader = req.headers.get('authorization') || '';
+    const isHostedCron = req.headers.get('x-vercel-cron') === '1';
 
-  console.log('process-recurring-reminders endpoint hit', {
-    at: new Date().toISOString(),
-    hostedCron: isHostedCron,
-  });
-
-  if ((!secret || authHeader !== `Bearer ${secret}`) && !isHostedCron) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const dueResult = await pool.query(
-    `SELECT r.reminderid, r.clientid, r.remindermethod, r.nextrunat, r.lastsentat, r.sendtime,
-            c.email, c.phone, c.firstname, c.lastname, c.birthdate
-     FROM reminders r
-     JOIN clients c ON c.clientid = r.clientid
-     WHERE r.isactive = TRUE
-       AND c.birthdate IS NOT NULL
-       AND r.nextrunat IS NOT NULL
-       AND r.nextrunat <= NOW()`
-  );
-
-  console.log('process-recurring-reminders due reminders', {
-    count: dueResult.rows.length,
-  });
-
-  let processed = 0;
-
-  for (const row of dueResult.rows) {
-    const nextRunAt = row.nextrunat ? new Date(row.nextrunat) : getNextBirthdayRunAt(row.birthdate, row.sendtime);
-    if (!nextRunAt) {
-      console.log('process-recurring-reminders skipped reminder', {
-        reminderId: row.reminderid,
-        reason: 'unable to resolve next run time',
-      });
-      continue;
-    }
-    const message = buildBirthdayMessage(row.firstname, row.lastname, row.birthdate);
-    const method = String(row.remindermethod || 'email').toLowerCase();
-
-    console.log('process-recurring-reminders sending reminder', {
-      reminderId: row.reminderid,
-      clientId: row.clientid,
-      method,
-      nextRunAt: nextRunAt.toISOString(),
-      recipient: row.email || row.phone || null,
+    console.log('process-recurring-reminders endpoint hit', {
+      at: new Date().toISOString(),
+      hostedCron: isHostedCron,
     });
 
-    if (method === 'email') {
-      await sendEmail({
-        to: row.email,
-        subject: 'Birthday reminder',
-        text: message,
-        html: `<p>${message}</p>`,
-      });
-    } else if (method === 'sms') {
-      await sendTwilioMessage(row.phone, message, false);
-    } else if (method === 'whatsapp') {
-      await sendTwilioMessage(row.phone, message, true);
+    if ((!secret || authHeader !== `Bearer ${secret}`) && !isHostedCron) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await pool.query(
-      `UPDATE reminders
-       SET lastsentat = NOW(), nextrunat = $1
-       WHERE reminderid = $2`,
-      [addOneYear(nextRunAt), row.reminderid]
+    const dueResult = await pool.query(
+      `SELECT r.reminderid, r.clientid, r.remindermethod, r.nextrunat, r.lastsentat, r.sendtime,
+              c.email, c.phone, c.firstname, c.lastname, c.birthdate
+       FROM reminders r
+       JOIN clients c ON c.clientid = r.clientid
+       WHERE r.isactive = TRUE
+         AND c.birthdate IS NOT NULL
+         AND r.nextrunat IS NOT NULL
+         AND r.nextrunat <= NOW()`
     );
 
-    console.log('process-recurring-reminders reminder completed', {
-      reminderId: row.reminderid,
+    console.log('process-recurring-reminders due reminders', {
+      count: dueResult.rows.length,
     });
 
-    processed += 1;
-  }
+    let processed = 0;
+    let failed = 0;
 
-  if (processed === 0) {
-    console.log('process-recurring-reminders no reminders were sent');
-  } else {
-    console.log('process-recurring-reminders processed reminders', {
-      processed,
+    for (const row of dueResult.rows) {
+      const nextRunAt = row.nextrunat ? new Date(row.nextrunat) : getNextBirthdayRunAt(row.birthdate, row.sendtime);
+      if (!nextRunAt) {
+        console.log('process-recurring-reminders skipped reminder', {
+          reminderId: row.reminderid,
+          reason: 'unable to resolve next run time',
+        });
+        continue;
+      }
+      const message = buildBirthdayMessage(row.firstname, row.lastname, row.birthdate);
+      const method = String(row.remindermethod || 'email').toLowerCase();
+
+      console.log('process-recurring-reminders sending reminder', {
+        reminderId: row.reminderid,
+        clientId: row.clientid,
+        method,
+        nextRunAt: nextRunAt.toISOString(),
+        recipient: row.email || row.phone || null,
+      });
+
+      try {
+        if (method === 'email') {
+          if (!row.email) {
+            throw new Error('Missing client email for email reminder');
+          }
+
+          await sendEmail({
+            to: row.email,
+            subject: 'Birthday reminder',
+            text: message,
+            html: `<p>${message}</p>`,
+          });
+        } else if (method === 'sms') {
+          if (!row.phone) {
+            throw new Error('Missing client phone for sms reminder');
+          }
+
+          await sendTwilioMessage(row.phone, message, false);
+        } else if (method === 'whatsapp') {
+          if (!row.phone) {
+            throw new Error('Missing client phone for whatsapp reminder');
+          }
+
+          await sendTwilioMessage(row.phone, message, true);
+        } else {
+          throw new Error(`Unsupported reminder method: ${method}`);
+        }
+
+        await pool.query(
+          `UPDATE reminders
+           SET lastsentat = NOW(), nextrunat = $1
+           WHERE reminderid = $2`,
+          [addOneYear(nextRunAt), row.reminderid]
+        );
+
+        console.log('process-recurring-reminders reminder completed', {
+          reminderId: row.reminderid,
+        });
+
+        processed += 1;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        console.error('process-recurring-reminders reminder failed', {
+          reminderId: row.reminderid,
+          clientId: row.clientid,
+          method,
+          error: message,
+        });
+
+        failed += 1;
+      }
+    }
+
+    if (processed === 0) {
+      console.log('process-recurring-reminders no reminders were sent');
+    } else {
+      console.log('process-recurring-reminders processed reminders', {
+        processed,
+        failed,
+      });
+    }
+
+    return NextResponse.json({ processed, failed });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : null;
+
+    console.error('process-recurring-reminders failed', {
+      error: message,
+      stack,
+      at: new Date().toISOString(),
     });
-  }
 
-  return NextResponse.json({ processed });
+    return NextResponse.json(
+      {
+        error: 'Failed to process recurring reminders',
+        details: message,
+      },
+      { status: 500 }
+    );
+  }
 }
