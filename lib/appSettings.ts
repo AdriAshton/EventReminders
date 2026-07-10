@@ -182,7 +182,7 @@ function normalizeCompanySettingsRow(row: CompanySettingsDbRow): CompanySettings
     gmail_user: typeof row.gmail_user === 'string' ? row.gmail_user : null,
     gmail_pass: typeof row.gmail_pass === 'string' ? row.gmail_pass : null,
     reminderdelivery: normalizeReminderDelivery(row.reminderdelivery ?? null),
-    messagetemplates: normalizeTemplates(row.messagetemplates ?? null),
+    messagetemplates: normalizeTemplates(row.messagetemplates ?? undefined),
   };
 }
 
