@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
+import { authenticatedFetch } from "@/lib/authClient";
 import { createTemplateId, renderTemplate } from "@/lib/messageTemplates";
 import { uploadMessageImage } from "@/services/messageService";
 
@@ -66,7 +67,7 @@ export default function TemplatesPage() {
 
   async function loadTemplates() {
     try {
-      const res = await fetch("/api/settings/message-template");
+      const res = await authenticatedFetch("/api/settings/message-template");
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Failed to load templates");
@@ -154,7 +155,7 @@ export default function TemplatesPage() {
     setError(null);
     try {
       const templateId = editor.id || createTemplateId(editor.name);
-      const res = await fetch("/api/settings/message-template", {
+      const res = await authenticatedFetch("/api/settings/message-template", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -187,7 +188,7 @@ export default function TemplatesPage() {
   async function handleSetDefault(templateId: string) {
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/message-template", {
+      const res = await authenticatedFetch("/api/settings/message-template", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -220,7 +221,7 @@ export default function TemplatesPage() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/message-template", {
+      const res = await authenticatedFetch("/api/settings/message-template", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

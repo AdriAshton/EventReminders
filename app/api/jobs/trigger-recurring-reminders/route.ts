@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
-  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const requestOrigin = new URL(req.url).origin;
+  const appUrl = (process.env.APP_URL || requestOrigin || 'http://localhost:3000').replace(/\/$/, '');
   const secret = process.env.JOB_SECRET;
   const authHeader = req.headers.get('authorization') || '';
 

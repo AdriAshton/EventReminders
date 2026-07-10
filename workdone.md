@@ -46,6 +46,14 @@ This file is a best-effort reconstruction of work completed in this project base
 
 ## Latest Work Added
 
+- Updated the invite and email settings flows so they use company-scoped settings instead of asking the user to type tenant values manually.
+- Added company-specific email credential storage to `company_settings` and created `migrations/019_add_company_settings_credentials.sql` for existing databases.
+- Updated the email sender helper to use per-company SMTP/Gmail credentials first, with environment variables only as fallback.
+- Updated the email settings screen to use authenticated requests and the invite screen to derive company context from the current session.
+- Updated the clients page so create and edit dialogs both enforce required fields, and made birthdate rendering deterministic to avoid hydration mismatches.
+- Updated the client filters so the dropdowns cascade one another instead of working independently.
+- Updated the email settings back button so it now routes to the dashboard.
+
 - Confirmed and documented the recurring reminders job flow under `app/api/jobs/process-recurring-reminders` and `app/api/jobs/trigger-recurring-reminders`.
 - Confirmed the settings area now includes a dedicated `app/settings/2fa` subpage alongside the main settings screen.
 - Confirmed auth routing now includes `login`, `signup`, `forgot`, and `reset` flows under `app/api/auth` and the matching app pages.
@@ -270,6 +278,15 @@ This log is therefore a reconstruction from the current codebase and visible ses
 #### Audit logging & schema
 
 ### 2026-06-30
+
+### 2026-07-09
+- Added a per-company email credential migration for `company_settings`.
+- Updated the email settings UI to save `From Email`, SMTP, and Gmail credentials per company on the existing email provider screen.
+- Updated the invite flow to use company context from the signed-in session and show the company name in the invite history.
+- Updated the client add/edit forms so all fields are mandatory and the edit form matches the create form requirements.
+- Updated the clients table birthdate display to use a deterministic format and prevent hydration warnings.
+- Updated the client filters so each dropdown cascades based on the other selected values.
+- Updated the email settings back button to navigate to the dashboard.
 
 ### 2026-07-07
 - Added the company onboarding document `COMPANY_ONBOARDING.md` with a step-by-step outline of the owner / invite / account setup flow.

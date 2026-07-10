@@ -69,6 +69,46 @@ type RawTemplateCollection = {
   birthdayDefault?: RawTemplateShape;
 };
 
+type CompanySettingsDbRow = {
+  companyid?: unknown;
+  emailprovider?: unknown;
+  emailfrom?: unknown;
+  smtp_host?: unknown;
+  smtp_port?: unknown;
+  smtp_secure?: unknown;
+  smtp_user?: unknown;
+  smtp_pass?: unknown;
+  gmail_user?: unknown;
+  gmail_pass?: unknown;
+  reminderdelivery?: unknown;
+  messagetemplates?: unknown;
+};
+
+let ensureCompanySettingsCredentialColumnsPromise: Promise<void> | null = null;
+
+async function ensureCompanySettingsCredentialColumns() {
+  if (!ensureCompanySettingsCredentialColumnsPromise) {
+    ensureCompanySettingsCredentialColumnsPromise = (async () => {
+      await pool.query(
+        `ALTER TABLE company_settings
+         ADD COLUMN IF NOT EXISTS emailfrom VARCHAR(255),
+         ADD COLUMN IF NOT EXISTS smtp_host VARCHAR(255),
+         ADD COLUMN IF NOT EXISTS smtp_port INT,
+         ADD COLUMN IF NOT EXISTS smtp_secure BOOLEAN,
+         ADD COLUMN IF NOT EXISTS smtp_user VARCHAR(255),
+         ADD COLUMN IF NOT EXISTS smtp_pass TEXT,
+         ADD COLUMN IF NOT EXISTS gmail_user VARCHAR(255),
+         ADD COLUMN IF NOT EXISTS gmail_pass TEXT`
+      );
+    })().catch((error) => {
+      ensureCompanySettingsCredentialColumnsPromise = null;
+      throw error;
+    });
+  }
+
+  await ensureCompanySettingsCredentialColumnsPromise;
+}
+
 function normalizeEmailSettings(rawEmail: unknown): EmailSettings {
   const candidate = typeof rawEmail === 'object' && rawEmail !== null ? rawEmail as { provider?: unknown } : {};
   const provider = candidate.provider === 'gmail' ? 'gmail' : 'mailtrap';
@@ -129,7 +169,7 @@ function normalizeTemplates(rawTemplates: RawTemplateCollection | undefined): { 
   };
 }
 
-function normalizeCompanySettingsRow(row: any): CompanySettingsRecord {
+function normalizeCompanySettingsRow(row: CompanySettingsDbRow): CompanySettingsRecord {
   return {
     companyid: Number(row.companyid),
     emailprovider: row.emailprovider === 'gmail' ? 'gmail' : 'mailtrap',
@@ -147,8 +187,22 @@ function normalizeCompanySettingsRow(row: any): CompanySettingsRecord {
 }
 
 export async function getCompanySettings(companyId: number) {
+  await ensureCompanySettingsCredentialColumns();
+
   const result = await pool.query(
-    `SELECT companyid, emailprovider, reminderdelivery, messagetemplates
+    `SELECT
+       companyid,
+       emailprovider,
+       emailfrom,
+       smtp_host,
+       smtp_port,
+       smtp_secure,
+       smtp_user,
+       smtp_pass,
+       gmail_user,
+       gmail_pass,
+       reminderdelivery,
+       messagetemplates
      FROM company_settings
      WHERE companyid = $1
      LIMIT 1`,
@@ -179,6 +233,8 @@ export async function getCompanySettings(companyId: number) {
 }
 
 export async function upsertCompanySettings(companyId: number, partial: Partial<CompanySettingsRecord>) {
+  await ensureCompanySettingsCredentialColumns();
+
   const current = await getCompanySettings(companyId);
   const emailProvider = partial.emailprovider || current.emailprovider;
   const emailfrom = partial.emailfrom ?? current.emailfrom ?? null;

@@ -103,3 +103,10 @@ To use it in production:
 The cron request is accepted by the Vercel cron entrypoint and then forwards to the protected job endpoint using `JOB_SECRET`.
 
 If you want the job to run more often, update `vercel.json` and redeploy.
+
+## Neon Database Notes
+
+- The app is currently configured to use a Neon PostgreSQL database through `DATABASE_URL` in `.env.local`.
+- `migrations/017_company_settings.sql` defines the per-company settings table, and `migrations/019_add_company_settings_credentials.sql` adds the company email credential columns for existing databases.
+- After changing the schema, run `node .\scripts\run_migrations.js` so the Neon database stays aligned with the app code.
+- The email settings screen now stores provider and credentials per company, while the mailer falls back to server environment values only when company-scoped values are absent.

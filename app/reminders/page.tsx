@@ -491,9 +491,9 @@ export default function RemindersPage() {
       </Dialog>
 
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Reminder Delivery</Typography>
+        <Typography variant="h6" sx={{ mb: 1 }}>Delivery Notes</Typography>
         <Typography variant="body2" color="text.secondary">
-          Birthday reminders are created automatically when a client is added. The send time and channel are global settings managed from Setup/Security via Reminder Delivery.
+          Birthday reminders are created automatically when a client is added and are processed by scheduled jobs.
         </Typography>
       </Paper>
       <Snackbar

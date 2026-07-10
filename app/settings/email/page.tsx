@@ -67,8 +67,10 @@ export default function EmailSettingsPage() {
   const [smtpPass, setSmtpPass] = useState("");
   const [gmailUser, setGmailUser] = useState("");
   const [gmailPass, setGmailPass] = useState("");
+  const [testRecipient, setTestRecipient] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
@@ -88,6 +90,7 @@ export default function EmailSettingsPage() {
         const payload = getTokenPayload(token);
         const resolvedCompanyName = String(payload?.companyname || payload?.companyName || "").trim();
         setCompanyName(resolvedCompanyName || null);
+        setTestRecipient(String(payload?.email || "").trim());
 
         const res = await authenticatedFetch("/api/settings/email-provider", { method: "GET" });
         const data = await res.json();
@@ -110,7 +113,7 @@ export default function EmailSettingsPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
   async function save(nextProvider: EmailProvider) {
     setSaving(true);
@@ -135,7 +138,7 @@ export default function EmailSettingsPage() {
       if (!res.ok) {
         setError(data.error || "Failed to save email provider");
         setToast({ open: true, message: data.error || "Failed to save email provider", severity: "error" });
-        return;
+        return false;
       }
       setProvider(data.provider);
       setEmailFrom(data.emailfrom || "");
@@ -147,30 +150,70 @@ export default function EmailSettingsPage() {
       setGmailUser(data.gmail_user || "");
       setGmailPass(data.gmail_pass || "");
       setToast({ open: true, message: `Email provider set to ${data.provider}`, severity: "success" });
+      return true;
     } catch {
       setError("Failed to save email provider");
       setToast({ open: true, message: "Failed to save email provider", severity: "error" });
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
+  async function sendTestEmail() {
+    setTestingEmail(true);
+    setError(null);
+    try {
+      const recipient = testRecipient.trim();
+      if (!recipient) {
+        setToast({ open: true, message: "Enter a recipient email for the test message", severity: "error" });
+        return;
+      }
+
+      const saved = await save(provider);
+      if (!saved) {
+        return;
+      }
+
+      const res = await authenticatedFetch("/api/settings/email-provider/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: recipient }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to send test email");
+        setToast({ open: true, message: data.error || "Failed to send test email", severity: "error" });
+        return;
+      }
+
+      setToast({ open: true, message: `Test email sent to ${recipient}`, severity: "success" });
+    } catch {
+      setError("Failed to send test email");
+      setToast({ open: true, message: "Failed to send test email", severity: "error" });
+    } finally {
+      setTestingEmail(false);
+    }
+  }
+
   return (
     <Box sx={{ p: 3 }}>
-      <Stack direction="row" sx={{ mb: 3, justifyContent: "space-between", alignItems: "center" }}>
-        <Box>
-          <Typography variant="h4">Email Provider</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Choose which SMTP provider the app should use when sending reset, 2FA, and provisioning emails.
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h4">Email Provider</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Choose which SMTP provider the app should use when sending reset, 2FA, and provisioning emails.
+        </Typography>
+        {companyName && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Company: {companyName}
           </Typography>
-          {companyName && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Company: {companyName}
-            </Typography>
-          )}
-        </Box>
-        <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
-      </Stack>
+        )}
+      </Box>
+
+      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 3 }}>
+        Back
+      </Button>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -221,6 +264,22 @@ export default function EmailSettingsPage() {
                 <TextField label="Gmail Password" type="password" value={gmailPass} onChange={(e) => setGmailPass(e.target.value)} fullWidth />
               </>
             )}
+          </Stack>
+
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ mt: 3 }}>
+            <TextField
+              label="Test Recipient Email"
+              value={testRecipient}
+              onChange={(e) => setTestRecipient(e.target.value)}
+              fullWidth
+            />
+            <Button
+              variant="contained"
+              onClick={sendTestEmail}
+              disabled={loading || saving || testingEmail}
+            >
+              {testingEmail ? "Sending..." : "Send Test Email"}
+            </Button>
           </Stack>
 
           <Alert severity="info" sx={{ mt: 3 }}>

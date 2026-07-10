@@ -44,16 +44,16 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [firstNameFilter, setFirstNameFilter] = useState<string>("");
   const [lastNameFilter, setLastNameFilter] = useState<string>("");
-  const [birthdateFilter, setBirthdateFilter] = useState<string>("");
+  const [draftFirstNameFilter, setDraftFirstNameFilter] = useState<string>("");
+  const [draftLastNameFilter, setDraftLastNameFilter] = useState<string>("");
   const [sortField, setSortField] = useState<"firstname" | "lastname" | "birthdate">("firstname");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [total, setTotal] = useState<number>(0);
-  const [filterValues, setFilterValues] = useState<{ firstnames: string[]; lastnames: string[]; birthdates: string[] }>({
+  const [filterValues, setFilterValues] = useState<{ firstnames: string[]; lastnames: string[] }>({
     firstnames: [],
     lastnames: [],
-    birthdates: [],
   });
   const [newClient, setNewClient] = useState({
     firstname: "",
@@ -172,39 +172,21 @@ export default function ClientsPage() {
     return leftText.localeCompare(rightText);
   }
 
-  const cascadedClients = clients
-    .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
-    .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
-    .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter));
-
   const firstNameOptions = [...new Set(
-    clients
-      .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
-      .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
-      .map((c) => String(c.firstname || "").trim())
+    (filterValues.firstnames || [])
+      .map((value) => String(value || "").trim())
       .filter(Boolean)
   )].sort(compareValues);
 
   const lastNameOptions = [...new Set(
-    clients
-      .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
-      .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
-      .map((c) => String(c.lastname || "").trim())
-      .filter(Boolean)
-  )].sort(compareValues);
-
-  const birthdateOptions = [...new Set(
-    clients
-      .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
-      .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
-      .map((c) => formatBirthdateDisplay(c.birthdate))
+    (filterValues.lastnames || [])
+      .map((value) => String(value || "").trim())
       .filter(Boolean)
   )].sort(compareValues);
 
   const sortedClients = [...clients]
     .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
     .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
-    .filter((c) => (birthdateFilter === "" ? true : formatBirthdateDisplay(c.birthdate) === birthdateFilter))
     .sort((left, right) => {
       const firstNameCompare = compareValues(left.firstname, right.firstname);
       const lastNameCompare = compareValues(left.lastname, right.lastname);
@@ -234,7 +216,12 @@ export default function ClientsPage() {
   useEffect(() => {
     loadClients(1);
     setPage(1);
-  }, [firstNameFilter, lastNameFilter, birthdateFilter, pageSize]);
+  }, [firstNameFilter, lastNameFilter, pageSize]);
+
+  useEffect(() => {
+    setDraftFirstNameFilter(firstNameFilter);
+    setDraftLastNameFilter(lastNameFilter);
+  }, [firstNameFilter, lastNameFilter]);
 
   useEffect(() => {
     loadFilterValues();
@@ -279,7 +266,6 @@ export default function ClientsPage() {
     const data = await getClients(pageParam, pageSize, {
       firstname: firstNameFilter,
       lastname: lastNameFilter,
-      birthdate: birthdateFilter,
     });
 
     if (data.error) {
@@ -303,7 +289,6 @@ export default function ClientsPage() {
     setFilterValues({
       firstnames: Array.isArray(data.firstnames) ? data.firstnames : [],
       lastnames: Array.isArray(data.lastnames) ? data.lastnames : [],
-      birthdates: Array.isArray(data.birthdates) ? data.birthdates : [],
     });
   }
 
@@ -359,6 +344,7 @@ export default function ClientsPage() {
       setDialogError(res.error);
     } else {
       await loadClients();
+      await loadFilterValues();
 
       setNewClient({
         firstname: "",
@@ -380,6 +366,7 @@ export default function ClientsPage() {
       setError(res.error);
     } else {
       await loadClients();
+      await loadFilterValues();
       setToast({ open: true, message: "Client deleted successfully", severity: "success" });
     }
   }
@@ -441,9 +428,60 @@ export default function ClientsPage() {
       setDialogError(res.error);
     } else {
       await loadClients();
+      await loadFilterValues();
       setEditingClient(null);
       setToast({ open: true, message: "Client updated successfully", severity: "success" });
     }
+  }
+
+  async function handleDownloadImportTemplate() {
+    try {
+      const xlsx = await import('xlsx');
+      const rows = [
+        {
+          firstname: 'John',
+          lastname: 'Smith',
+          email: 'john.smith@example.com',
+          phone: '15551234567',
+          birthdate: '1990-12-04',
+        },
+      ];
+
+      const worksheet = xlsx.utils.json_to_sheet(rows, {
+        header: ['firstname', 'lastname', 'email', 'phone', 'birthdate'],
+      });
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, 'Clients');
+
+      const workbookArray = xlsx.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([workbookArray], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'client_import_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setToast({ open: true, message: 'Failed to generate template. Ensure "xlsx" is installed.', severity: 'error' });
+    }
+  }
+
+  function applyFilters() {
+    setFirstNameFilter(draftFirstNameFilter);
+    setLastNameFilter(draftLastNameFilter);
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setDraftFirstNameFilter("");
+    setDraftLastNameFilter("");
+    setFirstNameFilter("");
+    setLastNameFilter("");
+    setPage(1);
   }
 
   const textFieldProps = {
@@ -539,6 +577,7 @@ export default function ClientsPage() {
 
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
         <Button variant="outlined" onClick={() => router.push("/dashboard")}>Back</Button>
+        <Button variant="outlined" onClick={handleDownloadImportTemplate}>Download Template</Button>
         <Button variant="contained" onClick={() => setAddDialogOpen(true)}>Add Client</Button>
         <Button component="span" variant="contained" onClick={() => document.getElementById('clients-import-input')?.click()}>Import</Button>
         <input
@@ -610,6 +649,7 @@ export default function ClientsPage() {
                 rowIndex++;
               }
               await loadClients(1);
+              await loadFilterValues();
               if (failures.length) {
                 setImportErrors(failures);
                 setImportDialogOpen(true);
@@ -643,9 +683,9 @@ export default function ClientsPage() {
             <InputLabel id="first-name-filter-label">First Name</InputLabel>
             <Select
               labelId="first-name-filter-label"
-              value={firstNameFilter}
+              value={draftFirstNameFilter}
               label="First Name"
-              onChange={(e) => setFirstNameFilter(String(e.target.value))}
+              onChange={(e) => setDraftFirstNameFilter(String(e.target.value))}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
@@ -658,9 +698,9 @@ export default function ClientsPage() {
             <InputLabel id="last-name-filter-label">Last Name</InputLabel>
             <Select
               labelId="last-name-filter-label"
-              value={lastNameFilter}
+              value={draftLastNameFilter}
               label="Last Name"
-              onChange={(e) => setLastNameFilter(String(e.target.value))}
+              onChange={(e) => setDraftLastNameFilter(String(e.target.value))}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
@@ -669,29 +709,8 @@ export default function ClientsPage() {
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-  <InputLabel id="birthdate-filter-label">
-    Birthdate
-  </InputLabel>
-  <Select
-    labelId="birthdate-filter-label"
-    value={birthdateFilter}
-    label="Birthdate"
-    onChange={(e) => setBirthdateFilter(String(e.target.value))}
-    sx={{
-      color: "#000",
-      backgroundColor: "#fff",
-    }}
-  >
-    <MenuItem value="">All</MenuItem>
-
-    {birthdateOptions.map((date) => (
-        <MenuItem key={date} value={date}>
-          {date}
-        </MenuItem>
-      ))}
-  </Select>
-</FormControl>
+          <Button variant="contained" onClick={applyFilters}>Apply Filters</Button>
+          <Button variant="outlined" onClick={clearFilters}>Clear</Button>
         </Box>
 
         <Pagination count={Math.max(1, Math.ceil(total / pageSize))} page={page} onChange={(_, value) => { setPage(value); loadClients(value); }} sx={{ '& .MuiPaginationItem-root': { color: '#000', backgroundColor: '#fff' }, '& .Mui-selected': { backgroundColor: `${paginationSelectedColor} !important`, color: '#fff' }, boxShadow: 1, borderRadius: 1 }} showFirstButton showLastButton />
@@ -759,7 +778,7 @@ export default function ClientsPage() {
         <DialogContent><Typography>Are you sure you want to delete {selectedIds.length} selected clients? This action cannot be undone.</Typography></DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmBulkOpen(false)}>Cancel</Button>
-          <Button color="error" onClick={async () => { setConfirmBulkOpen(false); const res = await deleteClients(selectedIds); if ((res as any).error) { setError((res as any).error); } else { setToast({ open: true, message: `Deleted ${res.deleted || selectedIds.length} clients`, severity: 'success' }); setSelectedIds([]); await loadClients(1); } }}>Delete</Button>
+          <Button color="error" onClick={async () => { setConfirmBulkOpen(false); const res = await deleteClients(selectedIds); if ((res as any).error) { setError((res as any).error); } else { setToast({ open: true, message: `Deleted ${res.deleted || selectedIds.length} clients`, severity: 'success' }); setSelectedIds([]); await loadClients(1); await loadFilterValues(); } }}>Delete</Button>
         </DialogActions>
       </Dialog>
 

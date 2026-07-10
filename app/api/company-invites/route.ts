@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 
+type AuthTokenPayload = {
+  userid?: number | string;
+  companyid?: number | string;
+};
+
 function verifyToken(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -10,7 +15,7 @@ function verifyToken(req: Request) {
   }
 
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  return jwt.verify(token, process.env.JWT_SECRET!) as AuthTokenPayload;
 }
 
 export async function GET(req: Request) {
@@ -34,8 +39,8 @@ export async function GET(req: Request) {
        ORDER BY inviteid DESC`
     );
     return NextResponse.json(result.rows);
-  } catch (err: any) {
-    const message = String(err?.message || "Failed to fetch invites");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to fetch invites";
     const status = message.toLowerCase().includes('does not exist') ? 500 : 401;
     return NextResponse.json({ error: message }, { status });
   }
@@ -45,7 +50,9 @@ export async function POST(req: Request) {
   try {
     const decoded = verifyToken(req);
     const body = await req.json();
-    const companyid = Number(body.companyid);
+    const tokenCompanyId = Number(decoded?.companyid);
+    const bodyCompanyId = Number(body.companyid);
+    const companyid = Number.isFinite(tokenCompanyId) && tokenCompanyId > 0 ? tokenCompanyId : bodyCompanyId;
     const email = String(body.email || "").trim();
     const roleid = Number(body.roleid);
 
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
       `INSERT INTO company_invites (companyid, email, roleid, token, invitedby, expiresat)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [companyid, email, roleid, token, decoded.userid, expiresAt]
+      [companyid, email, roleid, token, Number(decoded.userid) || null, expiresAt]
     );
 
     const inviteLink = `${process.env.APP_URL || "http://localhost:3000"}/signup?invite=${token}`;
@@ -70,14 +77,14 @@ export async function POST(req: Request) {
         subject: "You are invited to join the company",
         text: `You have been invited to join. Open this link: ${inviteLink}`,
         html: `<p>You have been invited to join. Open this link:</p><p><a href="${inviteLink}">${inviteLink}</a></p>`,
-      });
+      }, companyid);
     } catch (emailErr) {
       console.error("Invite email failed", emailErr);
     }
 
     return NextResponse.json(result.rows[0], { status: 201 });
-  } catch (err: any) {
-    const message = String(err?.message || "Failed to create invite");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to create invite";
     const status = message.toLowerCase().includes('does not exist') ? 500 : 500;
     return NextResponse.json({ error: message }, { status });
   }

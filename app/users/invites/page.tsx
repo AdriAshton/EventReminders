@@ -7,8 +7,11 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
+  Divider,
   MenuItem,
   Snackbar,
+  Stack,
   TextField,
   Typography,
 } from "@mui/material";
@@ -35,6 +38,9 @@ export default function InvitePage() {
   const [invites, setInvites] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [companyId, setCompanyId] = useState<number | null>(null);
+
+  const pendingCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "pending").length;
+  const acceptedCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "accepted").length;
 
   useEffect(() => {
     setMounted(true);
@@ -98,72 +104,129 @@ export default function InvitePage() {
   }
 
   return (
-    <Box sx={{ p: 3, maxWidth: 980, mx: "auto" }}>
-      <Button variant="outlined" onClick={() => router.push("/dashboard")} sx={{ mb: 2 }}>
-        Back
-      </Button>
+    <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2, gap: 2 }}>
+        <Box>
+          <Typography variant="h4" sx={{ mb: 0.5 }}>
+            Send Company Invite
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Invite teammates and track invite status in one place.
+          </Typography>
+        </Box>
+        <Button variant="outlined" onClick={() => router.push("/dashboard")}>
+          Back
+        </Button>
+      </Stack>
 
-      <Typography variant="h4" gutterBottom>
-        Send Company Invite
-      </Typography>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 0.6fr" }, mb: 3 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>New Invite</Typography>
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "minmax(0, 2fr) minmax(220px, 1fr)" } }}>
+              <TextField
+                label="Invite Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                select
+                label="Role"
+                value={roleid}
+                onChange={(e) => setRoleid(e.target.value)}
+                fullWidth
+              >
+                {ROLE_OPTIONS.map((role) => (
+                  <MenuItem key={role.roleid} value={String(role.roleid)}>
+                    {role.rolename}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
 
-      <Card sx={{ mb: 3 }}>
+            {error && (
+              <Typography color="error" sx={{ mt: 2 }}>
+                {error}
+              </Typography>
+            )}
+
+            <Box sx={{ mt: 2 }}>
+              <Button variant="contained" onClick={handleSendInvite}>
+                Send Invite
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>Overview</Typography>
+            <Stack spacing={1.5}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="body2" color="text.secondary">Total Invites</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>{invites.length}</Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="body2" color="text.secondary">Pending</Typography>
+                <Chip size="small" label={pendingCount} color="warning" variant="outlined" />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <Typography variant="body2" color="text.secondary">Accepted</Typography>
+                <Chip size="small" label={acceptedCount} color="success" variant="outlined" />
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
+
+      <Card>
         <CardContent>
-          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" } }}>
-            <TextField
-              label="Invite Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              fullWidth
-            />
-            <TextField
-              select
-              label="Role"
-              value={roleid}
-              onChange={(e) => setRoleid(e.target.value)}
-              fullWidth
-            >
-              {ROLE_OPTIONS.map((role) => (
-                <MenuItem key={role.roleid} value={String(role.roleid)}>
-                  {role.rolename}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
+          <Typography variant="h6" gutterBottom>
+            Recent Invites
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Latest invites for your company.
+          </Typography>
 
-          {error && (
-            <Typography color="error" sx={{ mt: 2 }}>
-              {error}
-            </Typography>
+          {invites.length === 0 ? (
+            <Typography color="text.secondary">No invites yet.</Typography>
+          ) : (
+            <Stack divider={<Divider flexItem />}>
+              {invites.map((invite) => {
+                const statusValue = String(invite.status || "").toLowerCase();
+                const chipColor = statusValue === "accepted"
+                  ? "success"
+                  : statusValue === "pending"
+                    ? "warning"
+                    : "default";
+
+                return (
+                  <Box key={invite.inviteid} sx={{ py: 1.5 }}>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 1 }}
+                    >
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        {invite.email}
+                      </Typography>
+                      <Chip size="small" label={invite.status} color={chipColor} variant="outlined" />
+                    </Stack>
+
+                    <Typography variant="body2" color="text.secondary">
+                      Company: {invite.companyname || `Company ${invite.companyid}`} | Role: {resolveRoleName(invite.roleid)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
+                      Invite Token: {invite.token}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
           )}
-
-          <Button variant="contained" onClick={handleSendInvite} sx={{ mt: 2 }}>
-            Send Invite
-          </Button>
         </CardContent>
       </Card>
-
-      <Typography variant="h6" gutterBottom>
-        Recent Invites
-      </Typography>
-      <Box sx={{ display: "grid", gap: 2 }}>
-        {invites.map((invite) => (
-          <Card key={invite.inviteid}>
-            <CardContent>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                {invite.email}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Company: {invite.companyname || `Company ${invite.companyid}`} | Role: {resolveRoleName(invite.roleid)} | Status: {invite.status}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Invite Token: {invite.token}
-              </Typography>
-            </CardContent>
-          </Card>
-        ))}
-      </Box>
 
       <Snackbar
         open={Boolean(status)}

@@ -14,16 +14,13 @@ export default function Dashboard() {
   const [totalBirthdays, setTotalBirthdays] = useState<number>(0);
   const [todayBirthdays, setTodayBirthdays] = useState<number>(0);
   const [upcomingBirthdayCount, setUpcomingBirthdayCount] = useState<number>(0);
-  const [emailsSentThisMonth, setEmailsSentThisMonth] = useState<number>(0);
+  const [emailsSentLast7Days, setEmailsSentLast7Days] = useState<number>(0);
   const [activeReminders, setActiveReminders] = useState<number>(0);
   const [isAdministrator, setIsAdministrator] = useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
 
   const [clientsRows, setClientsRows] = useState<any[]>([]);
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
-  const [recentActivity, setRecentActivity] = useState<Array<{ label: string; sublabel?: string }>>([]);
-  const [cronRunning, setCronRunning] = useState(false);
-  const [cronMessage, setCronMessage] = useState<string | null>(null);
 
   function formatDate(value: string | Date | null | undefined) {
     if (!value) return "";
@@ -33,36 +30,6 @@ export default function Dashboard() {
     const day = String(date.getDate()).padStart(2, '0');
     const year = date.getFullYear();
     return `${month}-${day}-${year}`;
-  }
-
-  async function runRecurringRemindersNow() {
-    setCronRunning(true);
-    setCronMessage(null);
-    try {
-      const response = await fetch('/api/jobs/trigger-recurring-reminders', { method: 'POST' });
-      const text = await response.text();
-      let payload: any = null;
-
-      try {
-        payload = JSON.parse(text);
-      } catch {
-        payload = null;
-      }
-
-      if (response.ok) {
-        const processed = typeof payload?.processed === 'number' ? payload.processed : null;
-        setCronMessage(processed !== null
-          ? `Recurring reminders processed: ${processed}`
-          : `Recurring reminders processed: ${text}`);
-      } else {
-        const errorMessage = payload?.error || text;
-        setCronMessage(`Recurring reminders failed: ${errorMessage}`);
-      }
-    } catch (error: any) {
-      setCronMessage(error?.message || 'Failed to trigger recurring reminders');
-    } finally {
-      setCronRunning(false);
-    }
   }
 
   function getBirthdayDate(client: any) {
@@ -130,15 +97,18 @@ export default function Dashboard() {
 
         const messages = await getMessages(1, 1000);
         const messageRows = messages.rows || [];
-        const currentMonth = new Date();
-        setEmailsSentThisMonth(
+        const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 7);
+
+        setEmailsSentLast7Days(
           messageRows.filter((message: any) => {
             const sentAt = message.sentat || message.sentAt;
             if (!sentAt) return false;
             const sentDate = new Date(sentAt);
             return !Number.isNaN(sentDate.getTime())
-              && sentDate.getMonth() === currentMonth.getMonth()
-              && sentDate.getFullYear() === currentMonth.getFullYear()
+              && sentDate >= sevenDaysAgo
+              && sentDate <= now
               && String(message.channel || '').toLowerCase() === 'email'
               && String(message.status || '').toLowerCase() === 'sent';
           }).length,
@@ -147,15 +117,6 @@ export default function Dashboard() {
         const reminders = await getReminders(1, 5);
         setActiveReminders(reminders.total || (reminders.rows ? reminders.rows.length : 0));
 
-        const latestClients = [...(clientsRows || [])].slice(0, 2).map((client: any) => ({
-          label: `New client: ${String(client.firstname || 'Client')} ${String(client.lastname || '')}`.trim(),
-          sublabel: client.email || '',
-        }));
-        const latestReminders = (reminders.rows || []).slice(0, 2).map((reminder: any) => ({
-          label: `Reminder scheduled: ${String(reminder.firstname || reminder.lastname || 'Client')}`,
-          sublabel: reminder.sendtime || '',
-        }));
-        setRecentActivity([...latestClients, ...latestReminders].slice(0, 4));
       } catch (err) {
         console.error(err);
       }
@@ -249,29 +210,6 @@ export default function Dashboard() {
         </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 3, mb: 3 }}>
-        {[
-          { label: 'Clients', value: totalClients, icon: 'C', color: theme.palette.primary.main },
-          { label: 'Today', value: todayBirthdays, icon: '🎂', color: theme.palette.secondary.main },
-          { label: 'Upcoming', value: upcomingBirthdayCount, icon: '⏱', color: '#16a34a' },
-          { label: 'Sent', value: emailsSentThisMonth, icon: '✉', color: '#0f766e' },
-        ].map((item) => (
-          <Box key={item.label}>
-            <Card sx={{ height: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: `${item.color}15`, color: item.color }}>
-                  <Typography variant="h6" sx={{ lineHeight: 1 }}>{item.icon}</Typography>
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">{item.label}</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 800 }}>{item.value}</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-        ))}
-      </Box>
-
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 3 }}>
         {/* Clients */}
       <Box>
@@ -349,9 +287,6 @@ export default function Dashboard() {
                   <Button variant="outlined" onClick={() => router.push('/settings/email')}>
                     Email Provider
                   </Button>
-                  <Button variant="outlined" onClick={() => router.push('/settings')}>
-                    Reminder Delivery
-                  </Button>
                 </Box>
               </CardContent>
             </Card>
@@ -421,7 +356,7 @@ export default function Dashboard() {
                 { label: "Today's Birthdays", value: todayBirthdays },
                 { label: 'Upcoming (7 Days)', value: upcomingBirthdayCount },
                 { label: 'Total Clients', value: totalClients },
-                { label: 'Emails Sent', value: emailsSentThisMonth },
+                { label: 'Emails Sent (Last 7 Days)', value: emailsSentLast7Days },
               ].map((item) => (
                 <Paper key={item.label} variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.72)' }}>
                   <Typography variant="caption" color="text.secondary">{item.label}</Typography>
@@ -433,44 +368,6 @@ export default function Dashboard() {
         </Card>
       </Box>
 
-      <Box sx={{ mt: 4 }}>
-        <Card sx={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-              <Avatar sx={{ bgcolor: 'rgba(14,165,233,0.12)', color: '#0f766e' }}>🔔</Avatar>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>Recent Activity</Typography>
-            </Box>
-            {isAdministrator && (
-              <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Button variant="outlined" onClick={runRecurringRemindersNow} disabled={cronRunning}>
-                  {cronRunning ? 'Running...' : 'Run Recurring Reminders Now'}
-                </Button>
-                {cronMessage && (
-                  <Typography variant="body2" color="text.secondary">
-                    {cronMessage}
-                  </Typography>
-                )}
-              </Box>
-            )}
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Latest activity across clients and reminders
-            </Typography>
-            <Divider sx={{ my: 1 }} />
-            <List>
-              {recentActivity.length ? recentActivity.map((item, index) => (
-                <ListItem key={`${item.label}-${index}`} sx={{ px: 0 }}>
-                  <ListItemText primary={item.label} secondary={item.sublabel || 'Updated recently'} />
-                  
-                </ListItem>
-              )) : (
-                <ListItem sx={{ px: 0 }}>
-                  <ListItemText primary="No recent activity yet" secondary="Activity will appear here as clients and reminders are updated." />
-                </ListItem>
-              )}
-            </List>
-          </CardContent>
-        </Card>
-      </Box>
     </Box>
   );
 }

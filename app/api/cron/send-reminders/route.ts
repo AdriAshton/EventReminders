@@ -4,7 +4,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const requestOrigin = new URL(req.url).origin;
+  const appUrl = (process.env.APP_URL || requestOrigin || 'http://localhost:3000').replace(/\/$/, '');
   const secret = process.env.JOB_SECRET;
 
   if (!secret) {
