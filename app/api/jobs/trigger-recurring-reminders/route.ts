@@ -1,8 +1,27 @@
 import { NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+function resolveAppUrl(req: Request) {
   const requestOrigin = new URL(req.url).origin;
-  const appUrl = (process.env.APP_URL || requestOrigin || 'http://localhost:3000').replace(/\/$/, '');
+  const configured = String(process.env.APP_URL || '').trim();
+
+  if (!configured) {
+    return requestOrigin;
+  }
+
+  try {
+    const configuredUrl = new URL(configured);
+    const host = configuredUrl.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return requestOrigin;
+    }
+    return configuredUrl.origin;
+  } catch {
+    return requestOrigin;
+  }
+}
+
+export async function POST(req: Request) {
+  const appUrl = resolveAppUrl(req).replace(/\/$/, '');
   const secret = process.env.JOB_SECRET;
   const authHeader = req.headers.get('authorization') || '';
 
