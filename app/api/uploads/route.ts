@@ -1,9 +1,8 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import sharp from "sharp";
+import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 
@@ -42,18 +41,17 @@ export async function POST(req: Request) {
       .webp({ quality: 78 })
       .toBuffer({ resolveWithObject: true });
 
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", "messages");
-    await mkdir(uploadsDir, { recursive: true });
-
     const safeName = sanitizeFileName(file.name || "upload");
     const baseName = safeName.replace(/\.[^.]+$/, "") || "upload";
     const fileName = `${Date.now()}-${randomUUID()}-${baseName}.webp`;
-    const filePath = path.join(uploadsDir, fileName);
 
-    await writeFile(filePath, processed.data);
+    const blob = await put(`messages/${fileName}`, processed.data, {
+      access: "public",
+      contentType: "image/webp",
+    });
 
     return NextResponse.json({
-      url: `/uploads/messages/${fileName}`,
+      url: blob.url,
       fileName: fileName,
       mimeType: "image/webp",
       size: processed.data.length,
