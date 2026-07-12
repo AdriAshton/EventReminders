@@ -96,3 +96,7 @@
 2026-07-02T12:17:35.463Z Reminder job error: fetch failed
 2026-07-02T12:18:35.531Z Starting reminder job against http://localhost:3000
 2026-07-02T12:18:35.671Z Reminder job error: fetch failed
+2026-07-12T14:10:13.273Z Starting reminder job against http://localhost:3000
+2026-07-12T14:10:13.380Z Reminder job error: fetch failed
+2026-07-12T14:10:18.192Z Starting reminder job against http://localhost:3000
+2026-07-12T14:10:18.391Z Reminder job error: fetch failed
