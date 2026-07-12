@@ -21,17 +21,33 @@ function sanitizeFileName(fileName: string) {
 
 export async function POST(req: Request) {
   try {
+    console.log('uploads route: request received', {
+      at: new Date().toISOString(),
+      contentType: req.headers.get('content-type'),
+      hasAuth: Boolean(req.headers.get('authorization')),
+    });
+
     const formData = await req.formData();
     const file = formData.get("file");
 
+    console.log('uploads route: form data parsed', {
+      hasFile: file instanceof File,
+      fileName: file instanceof File ? file.name : null,
+      fileType: file instanceof File ? file.type : null,
+      fileSize: file instanceof File ? file.size : null,
+    });
+
     if (!(file instanceof File)) {
+      console.log('uploads route: missing file');
       return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
     if (!file.type.startsWith("image/")) {
+      console.log('uploads route: invalid file type', { fileType: file.type });
       return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
     }
 
+    console.log('uploads route: starting image processing');
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -41,13 +57,31 @@ export async function POST(req: Request) {
       .webp({ quality: 78 })
       .toBuffer({ resolveWithObject: true });
 
+    console.log('uploads route: image processed', {
+      outputBytes: processed.data.length,
+      outputWidth: processed.info.width,
+      outputHeight: processed.info.height,
+    });
+
     const safeName = sanitizeFileName(file.name || "upload");
     const baseName = safeName.replace(/\.[^.]+$/, "") || "upload";
     const fileName = `${Date.now()}-${randomUUID()}-${baseName}.webp`;
 
+    console.log('uploads route: uploading to blob', {
+      fileName,
+      blobPath: `messages/${fileName}`,
+    });
+
     const blob = await put(`messages/${fileName}`, processed.data, {
       access: "public",
       contentType: "image/webp",
+    });
+
+    console.log('uploads route: blob upload complete', {
+      url: blob.url,
+      pathname: blob.pathname,
+      contentType: blob.contentType,
+      uploadedAt: blob.uploadedAt,
     });
 
     return NextResponse.json({
@@ -58,6 +92,10 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     const status = err?.message === "Unauthorized" ? 401 : 500;
+    console.error('uploads route: upload failed', {
+      message: err?.message || String(err),
+      stack: err?.stack || null,
+    });
     return NextResponse.json({ error: err.message || "Upload failed" }, { status });
   }
 }
