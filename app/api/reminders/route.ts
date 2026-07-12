@@ -186,24 +186,73 @@ export async function GET(req: Request) {
       return NextResponse.json(normalizeReminderRow(result.rows[0]));
     }
 
+    const firstNameParam = url.searchParams.get("firstName") || "";
+    const lastNameParam = url.searchParams.get("lastName") || "";
+
+    // filterOptions mode: returns distinct first/last names for cascading dropdowns
+    // firstNames are filtered by lastName only; lastNames are filtered by firstName only
+    if (url.searchParams.get("filterOptions") === "true") {
+      const fnConditions = [`r.companyid = $1`];
+      const fnParams: any[] = [companyId];
+      if (lastNameParam) {
+        fnParams.push(lastNameParam);
+        fnConditions.push(`c.lastname = $${fnParams.length}`);
+      }
+
+      const lnConditions = [`r.companyid = $1`];
+      const lnParams: any[] = [companyId];
+      if (firstNameParam) {
+        lnParams.push(firstNameParam);
+        lnConditions.push(`c.firstname = $${lnParams.length}`);
+      }
+
+      const [fnResult, lnResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT c.firstname FROM reminders r JOIN clients c ON c.clientid = r.clientid WHERE ${fnConditions.join(' AND ')} AND c.firstname IS NOT NULL ORDER BY c.firstname`,
+          fnParams
+        ),
+        pool.query(
+          `SELECT DISTINCT c.lastname FROM reminders r JOIN clients c ON c.clientid = r.clientid WHERE ${lnConditions.join(' AND ')} AND c.lastname IS NOT NULL ORDER BY c.lastname`,
+          lnParams
+        ),
+      ]);
+
+      return NextResponse.json({
+        firstNames: fnResult.rows.map((r) => r.firstname),
+        lastNames: lnResult.rows.map((r) => r.lastname),
+      });
+    }
+
     // support pagination: ?page=1&pageSize=10
     const page = Number(url.searchParams.get("page") || "1");
     const pageSize = Number(url.searchParams.get("pageSize") || "10");
     const offset = (Math.max(page, 1) - 1) * pageSize;
 
+    const conditions: string[] = [`r.companyid = $1`];
+    const params: any[] = [companyId];
+    if (firstNameParam) {
+      params.push(firstNameParam);
+      conditions.push(`c.firstname = $${params.length}`);
+    }
+    if (lastNameParam) {
+      params.push(lastNameParam);
+      conditions.push(`c.lastname = $${params.length}`);
+    }
+    const whereClause = conditions.join(' AND ');
+
     const dataResult = await pool.query(
       `SELECT r.*, c.firstname, c.lastname, c.birthdate, c.email
        FROM reminders r
        JOIN clients c ON c.clientid = r.clientid
-       WHERE r.companyid = $1
+       WHERE ${whereClause}
        ORDER BY r.reminderid
-       LIMIT $2 OFFSET $3`,
-      [companyId, pageSize, offset]
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, pageSize, offset]
     );
 
     const countResult = await pool.query(
-      'SELECT COUNT(*)::int as total FROM reminders WHERE companyid = $1',
-      [companyId]
+      `SELECT COUNT(*)::int as total FROM reminders r JOIN clients c ON c.clientid = r.clientid WHERE ${whereClause}`,
+      params
     );
 
     return NextResponse.json({

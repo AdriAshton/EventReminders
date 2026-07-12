@@ -8,7 +8,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_reminderid ON Messages(ReminderId);
 CREATE INDEX IF NOT EXISTS idx_users_roleid ON Users(RoleId);
 
 -- Indexes for date/time and status queries
-CREATE INDEX IF NOT EXISTS idx_reminders_datetime_status ON Reminders(ReminderDateTime, Status);
+CREATE INDEX IF NOT EXISTS idx_reminders_datetime_status ON Reminders(nextrunat, Status);
 CREATE INDEX IF NOT EXISTS idx_messages_status_sentat ON Messages(Status, SentAt);
 
 -- Optional: text lookup indexes (uncomment if used frequently)

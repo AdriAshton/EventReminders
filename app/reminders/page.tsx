@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 
 import {
   getReminders,
+  getReminderFilterOptions,
 } from "@/services/reminderServices";
 import { getMessages, getMessageTemplates, renderMessageTemplate } from "@/services/messageService";
 
@@ -37,6 +38,8 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState<any[]>([]);
   const [firstNameFilter, setFirstNameFilter] = useState<string>("");
   const [lastNameFilter, setLastNameFilter] = useState<string>("");
+  const [firstNameOptions, setFirstNameOptions] = useState<string[]>([]);
+  const [lastNameOptions, setLastNameOptions] = useState<string[]>([]);
   const [themeColor, setThemeColor] = useState<"purple" | "red" | "green">("purple");
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -126,16 +129,17 @@ export default function RemindersPage() {
   }, []);
 
   useEffect(() => {
-    loadReminders(page);
+    loadReminders(page, firstNameFilter, lastNameFilter);
   }, [page]);
 
   useEffect(() => {
     loadMessages();
     loadTemplates();
+    loadFilterOptions("", "");
   }, []);
 
-  async function loadReminders(pageParam: number = page) {
-    const data = await getReminders(pageParam, pageSize);
+  async function loadReminders(pageParam: number = page, firstName = firstNameFilter, lastName = lastNameFilter) {
+    const data = await getReminders(pageParam, pageSize, firstName, lastName);
 
     if (data.error) {
       setError(data.error);
@@ -143,6 +147,14 @@ export default function RemindersPage() {
       setReminders(data.rows || []);
       setTotal(data.total || 0);
       setError(null);
+    }
+  }
+
+  async function loadFilterOptions(firstName: string, lastName: string) {
+    const data = await getReminderFilterOptions(firstName, lastName);
+    if (!("error" in data)) {
+      setFirstNameOptions(data.firstNames || []);
+      setLastNameOptions(data.lastNames || []);
     }
   }
 
@@ -286,7 +298,7 @@ export default function RemindersPage() {
               const v = Number(e.target.value);
               setPageSize(v);
               setPage(1);
-              loadReminders(1);
+              loadReminders(1, firstNameFilter, lastNameFilter);
             }}
             sx={{ color: '#000', backgroundColor: '#fff' }}
           >
@@ -303,12 +315,18 @@ export default function RemindersPage() {
               labelId="reminders-first-name-filter"
               value={firstNameFilter}
               label="First Name"
-              onChange={(e) => setFirstNameFilter(String(e.target.value))}
+              onChange={(e) => {
+                const val = String(e.target.value);
+                setFirstNameFilter(val);
+                setPage(1);
+                loadReminders(1, val, lastNameFilter);
+                loadFilterOptions(val, lastNameFilter);
+              }}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
-              {[...new Set(reminders.map((r) => r.firstname).filter(Boolean))].map((name) => (
-                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              {firstNameOptions.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -318,12 +336,18 @@ export default function RemindersPage() {
               labelId="reminders-last-name-filter"
               value={lastNameFilter}
               label="Last Name"
-              onChange={(e) => setLastNameFilter(String(e.target.value))}
+              onChange={(e) => {
+                const val = String(e.target.value);
+                setLastNameFilter(val);
+                setPage(1);
+                loadReminders(1, firstNameFilter, val);
+                loadFilterOptions(firstNameFilter, val);
+              }}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
-              {[...new Set(reminders.map((r) => r.lastname).filter(Boolean))].map((name) => (
-                <MenuItem key={String(name)} value={String(name)}>{String(name)}</MenuItem>
+              {lastNameOptions.map((name) => (
+                <MenuItem key={name} value={name}>{name}</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -334,7 +358,7 @@ export default function RemindersPage() {
           page={page}
           onChange={(_, value) => {
             setPage(value);
-            loadReminders(value);
+            loadReminders(value, firstNameFilter, lastNameFilter);
           }}
           sx={{
             '& .MuiPagination-ul': {
@@ -388,8 +412,6 @@ export default function RemindersPage() {
 
           <TableBody>
             {reminders
-              .filter((r) => (firstNameFilter === "" ? true : String(r.firstname || "") === firstNameFilter))
-              .filter((r) => (lastNameFilter === "" ? true : String(r.lastname || "") === lastNameFilter))
               .map((reminder) => (
               <TableRow
                 key={reminder.reminderid}

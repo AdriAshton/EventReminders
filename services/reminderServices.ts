@@ -3,12 +3,15 @@
 import { authenticatedFetch } from "@/lib/authClient";
 
 // GET all reminders
-export async function getReminders(page = 1, pageSize = 10) {
-  const url = `/api/reminders?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
-    String(pageSize),
-  )}`;
+export async function getReminders(page = 1, pageSize = 10, firstName = "", lastName = "") {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (firstName) params.set("firstName", firstName);
+  if (lastName) params.set("lastName", lastName);
 
-  const res = await authenticatedFetch(url, {
+  const res = await authenticatedFetch(`/api/reminders?${params.toString()}`, {
     method: 'GET',
   });
   const data = await res.json();
@@ -16,6 +19,22 @@ export async function getReminders(page = 1, pageSize = 10) {
     return { error: data.error || 'Failed to fetch reminders' };
   }
   return data; // { rows, total }
+}
+
+// GET distinct first/last name options for cascading filters
+export async function getReminderFilterOptions(firstName = "", lastName = "") {
+  const params = new URLSearchParams({ filterOptions: "true" });
+  if (firstName) params.set("firstName", firstName);
+  if (lastName) params.set("lastName", lastName);
+
+  const res = await authenticatedFetch(`/api/reminders?${params.toString()}`, {
+    method: 'GET',
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    return { error: data.error || 'Failed to fetch filter options' };
+  }
+  return data as { firstNames: string[]; lastNames: string[] };
 }
 
 export async function getReminder(reminderid: number) {
