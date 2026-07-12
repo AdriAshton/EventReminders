@@ -81,7 +81,6 @@ export async function POST(req: Request) {
       url: blob.url,
       pathname: blob.pathname,
       contentType: blob.contentType,
-      uploadedAt: blob.uploadedAt,
     });
 
     return NextResponse.json({
