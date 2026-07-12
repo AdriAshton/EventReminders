@@ -163,6 +163,7 @@ export default function TemplatesPage() {
         body: JSON.stringify({
           ...editor,
           id: templateId,
+          imageUrl: editor.imageUrl || "",
           setActive: true,
         }),
       });
