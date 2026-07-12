@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     }
 
     const dueResult = await pool.query(
-      `SELECT r.reminderid, r.clientid, r.remindermethod, r.nextrunat, r.lastsentat, r.sendtime,
+      `SELECT r.reminderid, r.clientid, r.companyid, r.remindermethod, r.nextrunat, r.lastsentat, r.sendtime,
               c.email, c.phone, c.firstname, c.lastname, c.birthdate
        FROM reminders r
        JOIN clients c ON c.clientid = r.clientid
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
             subject: 'Birthday reminder',
             text: message,
             html: `<p>${message}</p>`,
-          });
+          }, Number(row.companyid));
         } else if (method === 'sms') {
           if (!row.phone) {
             throw new Error('Missing client phone for sms reminder');

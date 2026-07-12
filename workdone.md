@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-07-07
+Last updated: 2026-07-10
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -278,6 +278,51 @@ This log is therefore a reconstruction from the current codebase and visible ses
 #### Audit logging & schema
 
 ### 2026-06-30
+
+### 2026-07-10
+- Fixed company email-provider selection failure caused by missing `company_settings` columns (`emailfrom`, `smtp_host`, `smtp_port`, `smtp_secure`, `smtp_user`, `smtp_pass`, `gmail_user`, `gmail_pass`).
+- Added runtime schema safety in `lib/appSettings.ts` so missing credential columns are automatically ensured before settings reads/writes.
+- Applied migration `migrations/019_add_company_settings_credentials.sql` to the live database and verified columns exist.
+- Added a test-email feature on the email provider screen:
+  - UI updates in `app/settings/email/page.tsx`.
+  - New authenticated API endpoint `app/api/settings/email-provider/test/route.ts`.
+- Fixed invite emails using the wrong provider by passing company context to email sending in `app/api/company-invites/route.ts`.
+- Hid reminder-delivery settings UX for now by removing reminder-delivery controls from `app/settings/page.tsx`.
+- Updated settings/templates API usage to use authenticated fetch on `app/templates/page.tsx` to resolve Unauthorized errors.
+- Dashboard/UI cleanup updates:
+  - Removed redundant settings action under setup/security card.
+  - Removed Recent Activity block.
+  - Changed dashboard summary language to show `Emails Sent (Last 7 Days)`.
+  - Moved back-button placement on invite/email settings screens.
+  - Redesigned `app/users/invites/page.tsx` for cleaner layout and wider invite-email input.
+- Clients page enhancements in `app/clients/page.tsx`:
+  - Added Download Template button and XLSX template export.
+  - Removed birthdate filter.
+  - Populated first/last-name filter values from table data endpoints.
+  - Changed filter behavior to explicit `Apply Filters` and `Clear` workflow using draft selections.
+- Fixed cron relay URL resolution in production by hardening APP_URL handling:
+  - `app/api/cron/send-reminders/route.ts`
+  - `app/api/jobs/trigger-recurring-reminders/route.ts`
+  - Localhost/127.0.0.1 APP_URL is now ignored in hosted runtime and request origin is used.
+- Added temporary deep diagnostics for cron troubleshooting:
+  - Request-start and downstream-response logs in relay routes.
+  - try/catch around relay fetch calls with debug payload on failure.
+  - Top-level error logging in `app/api/jobs/process-recurring-reminders/route.ts`.
+- Fixed DB trigger/function drift that caused `ClientAudit.companyid` null insert errors:
+  - Added `migrations/020_fix_clientaudit_trigger_companyid.sql`.
+  - Recreated `log_client_changes()` and trigger to always include `CompanyId`.
+  - Validated with insert smoke-test and table/column checks.
+- Hardened recurring processor so one bad reminder does not crash the whole run:
+  - Added per-reminder error isolation and failed counters in `app/api/jobs/process-recurring-reminders/route.ts`.
+  - Added method/recipient validation guards per channel.
+- Fixed recurring email provider resolution by passing `companyid` into `sendEmail` from `app/api/jobs/process-recurring-reminders/route.ts`.
+- Fixed production build error in `lib/appSettings.ts` (`normalizeTemplates` null/undefined type mismatch) and revalidated successful builds.
+- Confirmed Vercel cron health from logs after deployment:
+  - `/api/cron/send-reminders` now resolves and calls downstream successfully with `status: 200`.
+- Executed direct SQL verification/tests against live database:
+  - Inserted a due reminder row for cron testing.
+  - Queried due reminders and confirmed due rows were present.
+  - Triggered manual processor endpoint and validated processed/failed response paths.
 
 ### 2026-07-09
 - Added a per-company email credential migration for `company_settings`.
