@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { sendEmail } from '@/lib/email';
+import { renderTemplate } from '@/lib/messageTemplates';
+import { getCompanySettings } from '@/lib/appSettings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -62,9 +64,19 @@ async function sendTwilioMessage(to: string, body: string, useWhatsApp: boolean)
   }
 }
 
-function buildBirthdayMessage(firstname: string, lastname: string, birthdate: string) {
+function buildBirthdayMessage(firstname: string, lastname: string, eventDate: string) {
   const name = [firstname, lastname].filter(Boolean).join(' ') || 'Client';
-  return `Happy birthday, ${name}! This is your yearly reminder for ${birthdate}.`;
+  return `Happy birthday, ${name}! This is your yearly reminder for ${eventDate}.`;
+}
+
+function formatEventDate(eventDate: string | Date | null | undefined) {
+  if (!eventDate) return '';
+  const date = new Date(eventDate);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${month}-${day}-${year}`;
 }
 
 export async function POST(req: Request) {
@@ -109,8 +121,20 @@ export async function POST(req: Request) {
         });
         continue;
       }
-      const message = buildBirthdayMessage(row.firstname, row.lastname, row.birthdate);
+      const eventDate = formatEventDate(row.birthdate);
+      const message = buildBirthdayMessage(row.firstname, row.lastname, eventDate || row.birthdate);
       const method = String(row.remindermethod || 'email').toLowerCase();
+      const clientName = [row.firstname, row.lastname].filter(Boolean).join(' ') || 'Client';
+      const companySettings = await getCompanySettings(Number(row.companyid));
+      const template = companySettings.messagetemplates.templates.find((item) => item.id === companySettings.messagetemplates.activeTemplateId)
+        || companySettings.messagetemplates.templates[0];
+      const templateValues = {
+        clientName,
+        companyName: `Company ${row.companyid}`,
+        eventDate,
+      };
+      const renderedSubject = template ? renderTemplate(template.subject || 'Happy Birthday, {{clientName}}!', templateValues) : 'Birthday reminder';
+      const renderedBody = template ? renderTemplate(template.body || message, templateValues) : message;
 
       console.log('process-recurring-reminders sending reminder', {
         reminderId: row.reminderid,
@@ -128,10 +152,28 @@ export async function POST(req: Request) {
 
           await sendEmail({
             to: row.email,
-            subject: 'Birthday reminder',
-            text: message,
-            html: `<p>${message}</p>`,
+            subject: renderedSubject,
+            text: renderedBody,
+            html: `<p>${renderedBody.replace(/\n/g, '</p><p>')}</p>`,
           }, Number(row.companyid));
+
+          await pool.query(
+            `INSERT INTO messages (
+              reminderid, channel, subject, messagebody,
+              attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            ON CONFLICT (reminderid) DO UPDATE SET
+              channel = EXCLUDED.channel,
+              subject = EXCLUDED.subject,
+              messagebody = EXCLUDED.messagebody,
+              attachmenturl = EXCLUDED.attachmenturl,
+              attachmentfilename = EXCLUDED.attachmentfilename,
+              attachmentmimetype = EXCLUDED.attachmentmimetype,
+              status = EXCLUDED.status,
+              sentat = EXCLUDED.sentat,
+              updatedat = NOW()`,
+            [row.reminderid, 'Email', renderedSubject, renderedBody, null, null, null, 'Sent']
+          );
         } else if (method === 'sms') {
           if (!row.phone) {
             throw new Error('Missing client phone for sms reminder');
