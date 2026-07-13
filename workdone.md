@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-07-10
+Last updated: 2026-07-12
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -46,6 +46,14 @@ This file is a best-effort reconstruction of work completed in this project base
 
 ## Latest Work Added
 
+- Fixed the recurring birthday reminder email path so it formats the event date before rendering the template and before building the fallback reminder text.
+- Updated the template editor so uploaded images are included in the save payload and persist in `company_settings.messagetemplates`.
+- Migrated the template image upload endpoint from local filesystem storage to Vercel Blob using `@vercel/blob`.
+- Added temporary debug logging to the upload route to trace the Blob upload flow during testing.
+- Installed `@vercel/blob` in the actual `birthday-reminder` project folder so the Next.js build can resolve the upload route dependency.
+- Verified `npm run build` passes successfully after removing the invalid `uploadedAt` debug field from the Blob upload log.
+- Confirmed the image upload route now returns the Blob URL instead of a local `/uploads/messages/...` path.
+
 - Updated the invite and email settings flows so they use company-scoped settings instead of asking the user to type tenant values manually.
 - Added company-specific email credential storage to `company_settings` and created `migrations/019_add_company_settings_credentials.sql` for existing databases.
 - Updated the email sender helper to use per-company SMTP/Gmail credentials first, with environment variables only as fallback.
@@ -64,6 +72,22 @@ This file is a best-effort reconstruction of work completed in this project base
 - Added a bootstrap SQL file and script for the invite tables: `migrations/016_bootstrap_company_invites.sql` and `scripts/bootstrap_company_invites.js`.
 - Successfully connected to the configured Neon database via `DATABASE_URL` and created the missing `company_invites` / `company_onboarding_profiles` tables with the bootstrap script.
 - Fixed the `/signup` page TypeScript and App Router suspense issue so `npm run build` completes successfully.
+
+## Verified Changes From This Session
+
+- `app/api/jobs/process-recurring-reminders/route.ts`
+  - Formats `eventDate` before rendering the template.
+  - Uses the formatted date in the fallback birthday message.
+- `app/templates/page.tsx`
+  - Sends `imageUrl` when saving a template.
+- `app/api/uploads/route.ts`
+  - Uploads processed images to Vercel Blob with `put(...)`.
+  - Returns `blob.url` instead of a local filesystem path.
+  - Includes temporary console logging for upload-stage debugging.
+- `package.json`
+  - Added `@vercel/blob`.
+- Validation
+  - `npm run build` passed successfully after fixing the Blob dependency and removing the invalid debug log field.
 
 ## Verified Installed Packages
 
