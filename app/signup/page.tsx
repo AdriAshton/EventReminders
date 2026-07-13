@@ -16,13 +16,15 @@ function SignupContent() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isInviteFlow = Boolean(invite);
+
   useEffect(() => {
-    if (invite) {
+    if (isInviteFlow) {
       setMessage("Invite detected. Complete your account to join the company.");
     } else {
       setMessage("Create your company and become the first administrator.");
     }
-  }, [invite]);
+  }, [isInviteFlow]);
 
   async function handleSubmit() {
     setError("");
@@ -33,14 +35,14 @@ function SignupContent() {
       return;
     }
 
-    if (!invite && !username.trim()) {
+    if (!isInviteFlow && !username.trim()) {
       setError("Username is required when creating a new company");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      if (invite) {
+      if (isInviteFlow) {
         const res = await fetch("/api/company-invites/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -90,13 +92,16 @@ function SignupContent() {
               {error}
             </Typography>
           )}
-          {!invite && (
+          {!isInviteFlow && (
             <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />
           )}
           <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth margin="normal" />
           <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
-          {!invite && (
+          {!isInviteFlow && (
             <TextField label="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} fullWidth margin="normal" />
+          )}
+          {isInviteFlow && (
+            <TextField label="Invite Token" value={invite} fullWidth margin="normal" InputProps={{ readOnly: true }} />
           )}
           <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Creating..." : "Continue"}
