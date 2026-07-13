@@ -101,7 +101,7 @@ function SignupContent() {
             <TextField label="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} fullWidth margin="normal" />
           )}
           {isInviteFlow && (
-            <TextField label="Invite Token" value={invite} fullWidth margin="normal" InputProps={{ readOnly: true }} />
+            <TextField label="Invite Token" value={invite} fullWidth margin="normal" disabled />
           )}
           <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Creating..." : "Continue"}
