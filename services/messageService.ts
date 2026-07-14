@@ -1,4 +1,5 @@
 import { authenticatedFetch } from "@/lib/authClient";
+import { compressImageFile } from "@/lib/imageCompression";
 
 export type MessageTemplate = {
   id: string;
@@ -95,8 +96,9 @@ export async function deleteMessage(messageid: number) {
 }
 
 export async function uploadMessageImage(file: File) {
+  const uploadFile = await compressImageFile(file);
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", uploadFile);
 
   const res = await authenticatedFetch("/api/uploads", {
     method: "POST",

@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import sharp from "sharp";
 import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
@@ -49,37 +48,24 @@ export async function POST(req: Request) {
 
     console.log('uploads route: starting image processing');
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      const errorMessage = 'Missing BLOB_READ_WRITE_TOKEN in the deployed environment';
       console.error('uploads route: missing BLOB_READ_WRITE_TOKEN');
-      return NextResponse.json({ error: 'File uploads are not configured on this deployment' }, { status: 500 });
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const processed = await sharp(buffer)
-      .rotate()
-      .resize({ width: 1200, withoutEnlargement: true, fit: "inside" })
-      .webp({ quality: 78 })
-      .toBuffer({ resolveWithObject: true });
-
-    console.log('uploads route: image processed', {
-      outputBytes: processed.data.length,
-      outputWidth: processed.info.width,
-      outputHeight: processed.info.height,
-    });
 
     const safeName = sanitizeFileName(file.name || "upload");
     const baseName = safeName.replace(/\.[^.]+$/, "") || "upload";
-    const fileName = `${Date.now()}-${randomUUID()}-${baseName}.webp`;
+    const extension = safeName.split(".").pop() || "bin";
+    const fileName = `${Date.now()}-${randomUUID()}-${baseName}.${extension}`;
 
     console.log('uploads route: uploading to blob', {
       fileName,
       blobPath: `messages/${fileName}`,
     });
 
-    const blob = await put(`messages/${fileName}`, processed.data, {
+    const blob = await put(`messages/${fileName}`, file, {
       access: "public",
-      contentType: "image/webp",
+      contentType: file.type || "application/octet-stream",
     });
 
     console.log('uploads route: blob upload complete', {
@@ -91,8 +77,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       url: blob.url,
       fileName: fileName,
-      mimeType: "image/webp",
-      size: processed.data.length,
+      mimeType: file.type || "application/octet-stream",
+      size: file.size,
     });
   } catch (err: any) {
     const status = err?.message === "Unauthorized" ? 401 : 500;
