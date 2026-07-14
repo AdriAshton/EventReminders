@@ -155,12 +155,22 @@ export async function POST(req: Request) {
             throw new Error('Missing client email for email reminder');
           }
 
+          console.log('process-recurring-reminders email provider handoff starting', {
+            reminderId: row.reminderid,
+            companyId: row.companyid,
+          });
+
           await sendEmail({
             to: row.email,
             subject: renderedSubject,
             text: renderedBody,
             html: emailHtml,
           }, Number(row.companyid));
+
+          console.log('process-recurring-reminders email provider handoff complete', {
+            reminderId: row.reminderid,
+            companyId: row.companyid,
+          });
 
           await pool.query(
             `INSERT INTO messages (
@@ -179,6 +189,11 @@ export async function POST(req: Request) {
               updatedat = NOW()`,
             [row.reminderid, 'Email', renderedSubject, renderedBody, null, null, null, 'Sent']
           );
+
+          console.log('process-recurring-reminders message row marked sent', {
+            reminderId: row.reminderid,
+            companyId: row.companyid,
+          });
         } else if (method === 'sms') {
           if (!row.phone) {
             throw new Error('Missing client phone for sms reminder');
@@ -195,11 +210,18 @@ export async function POST(req: Request) {
           throw new Error(`Unsupported reminder method: ${method}`);
         }
 
+        console.log('process-recurring-reminders updating reminder schedule', {
+          reminderId: row.reminderid,
+          nextRunAt: addOneYear(nextRunAt).toISOString(),
+        });
+
+        const nextScheduledRun = addOneYear(nextRunAt);
+
         await pool.query(
           `UPDATE reminders
            SET lastsentat = NOW(), nextrunat = $1
            WHERE reminderid = $2`,
-          [addOneYear(nextRunAt), row.reminderid]
+          [nextScheduledRun, row.reminderid]
         );
 
         console.log('process-recurring-reminders reminder completed', {
