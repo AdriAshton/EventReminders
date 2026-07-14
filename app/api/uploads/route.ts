@@ -46,13 +46,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Only image uploads are allowed" }, { status: 400 });
     }
 
-    console.log('uploads route: starting image processing');
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      const errorMessage = 'Missing BLOB_READ_WRITE_TOKEN in the deployed environment';
-      console.error('uploads route: missing BLOB_READ_WRITE_TOKEN');
-      return NextResponse.json({ error: errorMessage }, { status: 500 });
-    }
-
     const safeName = sanitizeFileName(file.name || "upload");
     const baseName = safeName.replace(/\.[^.]+$/, "") || "upload";
     const extension = safeName.split(".").pop() || "bin";
@@ -66,6 +59,7 @@ export async function POST(req: Request) {
     const blob = await put(`messages/${fileName}`, file, {
       access: "public",
       contentType: file.type || "application/octet-stream",
+      addRandomSuffix: true,
     });
 
     console.log('uploads route: blob upload complete', {
