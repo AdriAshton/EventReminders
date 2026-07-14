@@ -103,7 +103,10 @@ export async function uploadMessageImage(file: File) {
     body: formData,
   });
 
-  const data = await res.json();
+  const contentType = res.headers.get("content-type") || "";
+  const data = contentType.includes("application/json")
+    ? await res.json()
+    : { error: await res.text() };
   if (!res.ok) {
     return { error: data.error || "Failed to upload image" };
   }

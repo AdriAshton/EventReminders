@@ -48,6 +48,11 @@ export async function POST(req: Request) {
     }
 
     console.log('uploads route: starting image processing');
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('uploads route: missing BLOB_READ_WRITE_TOKEN');
+      return NextResponse.json({ error: 'File uploads are not configured on this deployment' }, { status: 500 });
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -95,6 +100,6 @@ export async function POST(req: Request) {
       message: err?.message || String(err),
       stack: err?.stack || null,
     });
-    return NextResponse.json({ error: err.message || "Upload failed" }, { status });
+    return NextResponse.json({ error: err?.message || "Upload failed" }, { status });
   }
 }
