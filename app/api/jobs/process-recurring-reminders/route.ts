@@ -137,8 +137,8 @@ export async function POST(req: Request) {
       const renderedBody = template ? renderTemplate(template.body || message, templateValues) : message;
       const renderedImageUrl = template?.imageUrl || '';
       const emailHtml = [
-        renderedImageUrl ? `<p><img src="${renderedImageUrl}" alt="Birthday reminder image" style="max-width:100%;height:auto;border-radius:12px;display:block;margin:0 0 16px 0;" /></p>` : '',
         `<p>${renderedBody.replace(/\n/g, '</p><p>')}</p>`,
+        renderedImageUrl ? `<p><img src="${renderedImageUrl}" alt="Birthday reminder image" style="max-width:320px;width:100%;height:auto;border-radius:12px;display:block;margin:16px 0 0 0;" /></p>` : '',
       ].filter(Boolean).join('');
 
       console.log('process-recurring-reminders sending reminder', {
