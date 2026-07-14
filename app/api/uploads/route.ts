@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       access: "public",
       contentType: file.type || "application/octet-stream",
       addRandomSuffix: true,
+      storeId: process.env.BLOB_PUBLIC_STORE_ID,
     });
 
     console.log('uploads route: blob upload complete', {
