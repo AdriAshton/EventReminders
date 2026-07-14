@@ -140,7 +140,7 @@ export default function TemplatesPage() {
 
     setEditor((current) => ({
       ...current,
-      imageUrl: (result as any).url || "",
+      imageUrl: (result as any).url || (result as any).downloadUrl || "",
     }));
     setToast({ open: true, message: "Template image uploaded", severity: "success" });
   }

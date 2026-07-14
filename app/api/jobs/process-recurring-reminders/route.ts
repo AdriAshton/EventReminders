@@ -132,9 +132,14 @@ export async function POST(req: Request) {
         clientName,
         companyName: `Company ${row.companyid}`,
         eventDate,
-      }; //Comment
+      };
       const renderedSubject = template ? renderTemplate(template.subject || 'Happy Birthday, {{clientName}}!', templateValues) : 'Birthday reminder';
       const renderedBody = template ? renderTemplate(template.body || message, templateValues) : message;
+      const renderedImageUrl = template?.imageUrl || '';
+      const emailHtml = [
+        renderedImageUrl ? `<p><img src="${renderedImageUrl}" alt="Birthday reminder image" style="max-width:100%;height:auto;border-radius:12px;display:block;margin:0 0 16px 0;" /></p>` : '',
+        `<p>${renderedBody.replace(/\n/g, '</p><p>')}</p>`,
+      ].filter(Boolean).join('');
 
       console.log('process-recurring-reminders sending reminder', {
         reminderId: row.reminderid,
@@ -154,7 +159,7 @@ export async function POST(req: Request) {
             to: row.email,
             subject: renderedSubject,
             text: renderedBody,
-            html: `<p>${renderedBody.replace(/\n/g, '</p><p>')}</p>`,
+            html: emailHtml,
           }, Number(row.companyid));
 
           await pool.query(

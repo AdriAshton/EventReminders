@@ -1,6 +1,6 @@
 # Work Done Log
 
-Last updated: 2026-07-12
+Last updated: 2026-07-14
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
 
@@ -49,10 +49,12 @@ This file is a best-effort reconstruction of work completed in this project base
 - Fixed the recurring birthday reminder email path so it formats the event date before rendering the template and before building the fallback reminder text.
 - Updated the template editor so uploaded images are included in the save payload and persist in `company_settings.messagetemplates`.
 - Migrated the template image upload endpoint from local filesystem storage to Vercel Blob using `@vercel/blob`.
-- Added temporary debug logging to the upload route to trace the Blob upload flow during testing.
-- Installed `@vercel/blob` in the actual `birthday-reminder` project folder so the Next.js build can resolve the upload route dependency.
-- Verified `npm run build` passes successfully after removing the invalid `uploadedAt` debug field from the Blob upload log.
+- Switched the upload flow from native server-side image processing to browser-side compression to avoid the Vercel Linux `sharp`/`libvips` runtime failure.
+- Updated the upload route to use the connected public Blob store via `storeId: process.env.BLOB_PUBLIC_STORE_ID` and rely on Vercel OIDC instead of `BLOB_READ_WRITE_TOKEN`.
+- Added `addRandomSuffix: true` to Blob uploads so template image filenames stay unique.
+- Verified `npm run build` passes successfully after removing the native `sharp` dependency from the upload path.
 - Confirmed the image upload route now returns the Blob URL instead of a local `/uploads/messages/...` path.
+- Documented that the Blob store must be connected to the same Vercel project and that the public store uses `BLOB_PUBLIC_STORE_ID`.
 
 - Updated the invite and email settings flows so they use company-scoped settings instead of asking the user to type tenant values manually.
 - Added company-specific email credential storage to `company_settings` and created `migrations/019_add_company_settings_credentials.sql` for existing databases.
@@ -81,11 +83,18 @@ This file is a best-effort reconstruction of work completed in this project base
 - `app/templates/page.tsx`
   - Sends `imageUrl` when saving a template.
 - `app/api/uploads/route.ts`
-  - Uploads processed images to Vercel Blob with `put(...)`.
+  - Uploads images to Vercel Blob with `put(...)`.
+  - Uses `storeId: process.env.BLOB_PUBLIC_STORE_ID` so the public store connection is selected explicitly.
+  - Uses `addRandomSuffix: true` to avoid filename collisions.
   - Returns `blob.url` instead of a local filesystem path.
   - Includes temporary console logging for upload-stage debugging.
+- `lib/imageCompression.ts`
+  - Adds browser-side image compression so uploads do not depend on native server image processing.
+- `services/messageService.ts`
+  - Compresses image files before uploading them to the Blob route.
 - `package.json`
   - Added `@vercel/blob`.
+  - Removed `sharp` after moving image processing to the browser.
 - Validation
   - `npm run build` passed successfully after fixing the Blob dependency and removing the invalid debug log field.
 
@@ -130,7 +139,7 @@ The application was built with these verified tools and services:
 - Password hashing via `bcrypt`.
 - Email tooling via `nodemailer` and `@sendgrid/mail`.
 - Spreadsheet import support via `xlsx`.
-- Image processing support via `sharp`.
+- Browser-side image compression via the DOM canvas/image APIs.
 - TOTP/2FA support via `speakeasy`.
 - File watching for rebuilds via `chokidar-cli`.
 - Local environment loading via `dotenv`.
