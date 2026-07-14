@@ -132,7 +132,7 @@ export async function POST(req: Request) {
         clientName,
         companyName: `Company ${row.companyid}`,
         eventDate,
-      };
+      }; //Comment
       const renderedSubject = template ? renderTemplate(template.subject || 'Happy Birthday, {{clientName}}!', templateValues) : 'Birthday reminder';
       const renderedBody = template ? renderTemplate(template.body || message, templateValues) : message;
 
