@@ -189,10 +189,11 @@ export async function POST(req: Request) {
 
           await pool.query(
             `INSERT INTO messages (
-              reminderid, channel, subject, messagebody,
+              reminderid, companyid, channel, subject, messagebody,
               attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
             ON CONFLICT (reminderid) DO UPDATE SET
+              companyid = EXCLUDED.companyid,
               channel = EXCLUDED.channel,
               subject = EXCLUDED.subject,
               messagebody = EXCLUDED.messagebody,
@@ -202,7 +203,7 @@ export async function POST(req: Request) {
               status = EXCLUDED.status,
               sentat = EXCLUDED.sentat,
               updatedat = NOW()`,
-            [row.reminderid, 'Email', renderedSubject, renderedBody, null, null, null, 'Sent']
+            [row.reminderid, row.companyid, 'Email', renderedSubject, renderedBody, null, null, null, 'Sent']
           );
 
           console.log('process-recurring-reminders message row marked sent', {
