@@ -79,6 +79,21 @@ function formatEventDate(eventDate: string | Date | null | undefined) {
   return `${month}-${day}-${year}`;
 }
 
+function formatSqlTimestamp(dateValue: Date) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 export async function POST(req: Request) {
   try {
     const secret = envValue('JOB_SECRET');
@@ -216,13 +231,24 @@ export async function POST(req: Request) {
         });
 
         const nextScheduledRun = addOneYear(nextRunAt);
+        const nextScheduledRunSql = formatSqlTimestamp(nextScheduledRun);
 
-        await pool.query(
+        if (!nextScheduledRunSql) {
+          throw new Error('Unable to format next reminder schedule timestamp');
+        }
+
+        const scheduleResult = await pool.query(
           `UPDATE reminders
            SET lastsentat = NOW(), nextrunat = $1
            WHERE reminderid = $2`,
-          [nextScheduledRun, row.reminderid]
+          [nextScheduledRunSql, row.reminderid]
         );
+
+        console.log('process-recurring-reminders reminder schedule updated', {
+          reminderId: row.reminderid,
+          rowCount: scheduleResult.rowCount,
+          nextRunAt: nextScheduledRunSql,
+        });
 
         console.log('process-recurring-reminders reminder completed', {
           reminderId: row.reminderid,
