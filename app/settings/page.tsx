@@ -52,8 +52,8 @@ export default function SettingsPage() {
       localStorage.setItem("theme", value);
       // allow the app to react to theme change by reloading or emitting an event
       window.dispatchEvent(new Event("theme-change"));
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -88,8 +88,8 @@ export default function SettingsPage() {
       } else {
         setSecurityMessage(verifyData?.error || 'Invalid verification code');
       }
-    } catch (err: any) {
-      setSecurityMessage(err?.message || 'Failed to enable 2FA');
+    } catch (err: unknown) {
+      setSecurityMessage(err instanceof Error ? err.message : 'Failed to enable 2FA');
     }
   }
 
@@ -112,8 +112,8 @@ export default function SettingsPage() {
       }
       setTwoFactorEnabled(false);
       setSecurityMessage(data?.message || '2FA disabled for your account');
-    } catch (err: any) {
-      setSecurityMessage(err?.message || 'Failed to disable 2FA');
+    } catch (err: unknown) {
+      setSecurityMessage(err instanceof Error ? err.message : 'Failed to disable 2FA');
     }
   }
 

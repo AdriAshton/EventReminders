@@ -9,6 +9,19 @@ export type MessageTemplate = {
   imageUrl?: string;
 };
 
+export type UploadMessageImageResponse = {
+  error?: string;
+  url?: string;
+  downloadUrl?: string;
+};
+
+export type MessageTemplateResponse = {
+  error?: string;
+  activeTemplateId: string;
+  templates: MessageTemplate[];
+  template: MessageTemplate;
+};
+
 export async function getMessages(page = 1, pageSize = 10) {
   const url = `/api/messages?page=${encodeURIComponent(String(page))}&pageSize=${encodeURIComponent(
     String(pageSize),

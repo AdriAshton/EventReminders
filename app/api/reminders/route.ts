@@ -34,18 +34,14 @@ async function getDefaultCompany() {
   return result.rows[0] || null;
 }
 
-function getNextBirthdayRunAt(birthdate: string | null | undefined, sendTime: string | null | undefined) {
+function getNextBirthdayRunAt(birthdate: string | null | undefined) {
   if (!birthdate) return null;
 
   const birth = new Date(birthdate);
   if (Number.isNaN(birth.getTime())) return null;
 
   const now = new Date();
-  const month = birth.getMonth();
-  const day = birth.getDate();
-  const [hours, minutes, seconds] = String(sendTime || '09:00:00').split(':').map((part) => Number(part || 0));
-
-  const candidate = new Date(now.getFullYear(), month, day, hours, minutes, seconds || 0, 0);
+  const candidate = new Date(now.getFullYear(), birth.getMonth(), birth.getDate(), 0, 0, 0, 0);
   if (candidate < now) {
     candidate.setFullYear(candidate.getFullYear() + 1);
   }
@@ -64,10 +60,10 @@ async function getReminderRecipient(clientid: number) {
   return result.rows[0] || null;
 }
 
-function normalizeReminderRow(row: { birthdate?: string | null; sendtime?: string | null; nextrunat?: string | Date | null; [key: string]: any }) {
+function normalizeReminderRow(row: { birthdate?: string | null; nextrunat?: string | Date | null; [key: string]: any }) {
   if (row?.nextrunat) return row;
 
-  const nextRunAt = getNextBirthdayRunAt(row.birthdate, row.sendtime);
+  const nextRunAt = row.birthdate ? getNextBirthdayRunAt(row.birthdate) : null;
   return {
     ...row,
     nextrunat: nextRunAt ? nextRunAt.toISOString() : row.nextrunat,
@@ -273,10 +269,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Company access is required" }, { status: 403 });
     }
 
-    const { clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
+    const { clientid, reminderdatetime, remindermethod, status, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
     const recipient = await getReminderRecipient(Number(clientid));
-    const scheduledAt = getNextBirthdayRunAt(recipient?.birthdate, sendtime) || (reminderdatetime ? new Date(reminderdatetime) : null);
+    const scheduledAt = recipient?.birthdate ? getNextBirthdayRunAt(recipient.birthdate) : (reminderdatetime ? new Date(reminderdatetime) : null);
 
     if (method.toLowerCase() === 'whatsapp') {
       console.log('WhatsApp reminder payload:', {
@@ -284,7 +280,6 @@ export async function POST(req: Request) {
         reminderdatetime: scheduledAt ?? reminderdatetime,
         remindermethod: method,
         status,
-        sendtime,
         isactive,
       });
     }
@@ -309,15 +304,14 @@ export async function POST(req: Request) {
     }
 
     await pool.query(
-      `INSERT INTO reminders (clientid, companyid, reminderdatetime, remindermethod, status, sendtime, isactive, nextrunat) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO reminders (clientid, companyid, reminderdatetime, remindermethod, status, isactive, nextrunat) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         clientid,
         companyId,
         scheduledAt,
         method,
         status || "Pending",
-        sendtime || "09:00:00",
         isactive ?? true,
         scheduledAt,
       ]
@@ -338,10 +332,10 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "Company access is required" }, { status: 403 });
     }
 
-    const { reminderid, clientid, reminderdatetime, remindermethod, status, sendtime, isactive } = await req.json();
+    const { reminderid, clientid, reminderdatetime, remindermethod, status, isactive } = await req.json();
     const method = String(remindermethod || '').trim();
     const recipient = await getReminderRecipient(Number(clientid));
-    const scheduledAt = getNextBirthdayRunAt(recipient?.birthdate, sendtime) || (reminderdatetime ? new Date(reminderdatetime) : null);
+    const scheduledAt = recipient?.birthdate ? getNextBirthdayRunAt(recipient.birthdate) : (reminderdatetime ? new Date(reminderdatetime) : null);
 
     if (method.toLowerCase() === 'whatsapp') {
       console.log('WhatsApp reminder payload:', {
@@ -350,7 +344,6 @@ export async function PUT(req: Request) {
         reminderdatetime: scheduledAt ?? reminderdatetime,
         remindermethod: method,
         status,
-        sendtime,
         isactive,
       });
     }
@@ -374,14 +367,13 @@ export async function PUT(req: Request) {
 
     await pool.query(
       `UPDATE reminders 
-       SET clientid = $1, reminderdatetime = $2, remindermethod = $3, status = $4, sendtime = $5, isactive = $6, nextrunat = $7
-       WHERE reminderid = $8 AND companyid = $9`,
+       SET clientid = $1, reminderdatetime = $2, remindermethod = $3, status = $4, isactive = $5, nextrunat = $6
+       WHERE reminderid = $7 AND companyid = $8`,
       [
         clientid,
         scheduledAt,
         method,
         status,
-        sendtime || "09:00:00",
         isactive ?? true,
         scheduledAt,
         reminderid,

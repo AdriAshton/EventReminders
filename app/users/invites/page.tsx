@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
-import { getCompanyInvites, sendCompanyInvite } from "@/services/companyInviteService";
+import { getCompanyInvites, sendCompanyInvite, type CompanyInviteRecord, type CompanyInviteResponse } from "@/services/companyInviteService";
 
 const ROLE_OPTIONS = [
   { roleid: 1, rolename: "Administrator" },
@@ -35,7 +35,7 @@ export default function InvitePage() {
   const [roleid, setRoleid] = useState("2");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [invites, setInvites] = useState<any[]>([]);
+  const [invites, setInvites] = useState<CompanyInviteRecord[]>([]);
   const [mounted, setMounted] = useState(false);
   const [companyId, setCompanyId] = useState<number | null>(null);
 
@@ -66,16 +66,16 @@ export default function InvitePage() {
 
     setCompanyId(resolvedCompanyId);
 
-    loadInvites();
+    void loadInvites();
   }, [mounted, router]);
 
   async function loadInvites() {
-    const data = await getCompanyInvites();
+    const data = (await getCompanyInvites()) as CompanyInviteResponse;
     if (data.error) {
       setError(data.error);
       return;
     }
-    setInvites(Array.isArray(data) ? data : []);
+    setInvites(data.invites || []);
   }
 
   async function handleSendInvite() {

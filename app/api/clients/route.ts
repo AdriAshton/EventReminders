@@ -46,13 +46,12 @@ function isFutureBirthdate(value: unknown) {
   return date > today;
 }
 
-function getNextBirthdayRunAt(birthdate: string, sendTime: string) {
+function getNextBirthdayRunAt(birthdate: string) {
   const birth = new Date(birthdate);
   if (Number.isNaN(birth.getTime())) return null;
 
   const now = new Date();
-  const [hours, minutes, seconds] = String(sendTime || "09:00:00").split(":").map((part) => Number(part || 0));
-  const candidate = new Date(now.getFullYear(), birth.getMonth(), birth.getDate(), hours || 0, minutes || 0, seconds || 0, 0);
+  const candidate = new Date(now.getFullYear(), birth.getMonth(), birth.getDate(), 0, 0, 0, 0);
 
   if (candidate < now) {
     candidate.setFullYear(candidate.getFullYear() + 1);
@@ -183,20 +182,18 @@ export async function POST(req: Request) {
     );
 
     const client = result.rows[0];
-    const reminderDelivery = (await getCompanySettings(normalizedCompanyId)).reminderdelivery;
-    const reminderDate = getNextBirthdayRunAt(birthdate, reminderDelivery.sendTime);
+    const reminderDate = getNextBirthdayRunAt(birthdate);
 
     if (reminderDate) {
       const reminderResult = await pool.query(
-        `INSERT INTO reminders (clientid, companyid, remindermethod, status, sendtime, isactive, nextrunat)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO reminders (clientid, companyid, remindermethod, status, isactive, nextrunat)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING reminderid`,
         [
           client.clientid,
           normalizedCompanyId,
-          reminderDelivery.channel,
+          'Email',
           'Pending',
-          `${reminderDelivery.sendTime}:00`,
           true,
           reminderDate,
         ]
@@ -212,7 +209,7 @@ export async function POST(req: Request) {
           [
             reminderId,
             normalizedCompanyId,
-            reminderDelivery.channel,
+            'Email',
             null,
             '',
             null,

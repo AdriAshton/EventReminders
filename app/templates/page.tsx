@@ -20,7 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/lib/authClient";
 import { createTemplateId, renderTemplate } from "@/lib/messageTemplates";
-import { uploadMessageImage } from "@/services/messageService";
+import { uploadMessageImage, type MessageTemplateResponse, type UploadMessageImageResponse } from "@/services/messageService";
 
 type TemplateState = {
   id: string;
@@ -61,14 +61,10 @@ export default function TemplatesPage() {
   const bodyRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const [activeField, setActiveField] = useState<"subject" | "body">("body");
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
   async function loadTemplates() {
     try {
       const res = await authenticatedFetch("/api/settings/message-template");
-      const data = await res.json();
+      const data = (await res.json()) as MessageTemplateResponse;
       if (!res.ok) {
         setError(data.error || "Failed to load templates");
         return;
@@ -132,15 +128,15 @@ export default function TemplatesPage() {
   }
 
   async function handleTemplateImageUpload(file: File) {
-    const result = await uploadMessageImage(file);
-    if ((result as any).error) {
-      setToast({ open: true, message: (result as any).error, severity: "error" });
+    const result = (await uploadMessageImage(file)) as UploadMessageImageResponse;
+    if (result.error) {
+      setToast({ open: true, message: result.error, severity: "error" });
       return;
     }
 
     setEditor((current) => ({
       ...current,
-      imageUrl: (result as any).url || (result as any).downloadUrl || "",
+      imageUrl: result.url || result.downloadUrl || "",
     }));
     setToast({ open: true, message: "Template image uploaded", severity: "success" });
   }
@@ -244,6 +240,10 @@ export default function TemplatesPage() {
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    void loadTemplates();
+  }, []);
 
   return (
     <Box sx={{ p: 3 }}>

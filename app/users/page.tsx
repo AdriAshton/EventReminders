@@ -28,6 +28,8 @@ import {
   addUser,
   deleteUser,
   updateUser,
+  type UserRecord,
+  type UserListResponse,
 } from "@/services/userService";
 
 const ROLE_OPTIONS = [
@@ -37,10 +39,9 @@ const ROLE_OPTIONS = [
 
 export default function UsersPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [usernameFilter, setUsernameFilter] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
-  const [fkFilter, setFkFilter] = useState<number | string>("");
   const [newUser, setNewUser] = useState({
     username: "",
     password: "",
@@ -48,7 +49,7 @@ export default function UsersPage() {
     email: "",
   });
 
-  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editingUser, setEditingUser] = useState<(UserRecord & { confirmPassword?: string }) | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -61,20 +62,12 @@ export default function UsersPage() {
     loadUsers();
   }, []);
 
-  function normalizeUser(user: any) {
+  function normalizeUser(user: UserRecord) {
     return {
       ...user,
       roleid: user.roleid ?? ROLE_OPTIONS.find((role) => role.rolename === user.role)?.roleid ?? ROLE_OPTIONS[1].roleid,
     };
   }
-
-  const usernameOptions = [...new Set(users.map((user) => String(user.username || "").trim()).filter(Boolean))].sort((left, right) =>
-    left.localeCompare(right)
-  );
-
-  const emailOptions = [...new Set(users.map((user) => String(user.email || "").trim()).filter(Boolean))].sort((left, right) =>
-    left.localeCompare(right)
-  );
 
   const filteredUsers = users.filter((user) => (usernameFilter === "" ? true : String(user.username || "") === usernameFilter))
     .filter((user) => (emailFilter === "" ? true : String(user.email || "") === emailFilter));
@@ -94,12 +87,12 @@ export default function UsersPage() {
   )].sort((left, right) => left.localeCompare(right));
 
   async function loadUsers() {
-    const data = await getUsers();
+    const data = (await getUsers()) as UserListResponse;
 
     if (data.error) {
       setError(data.error);
     } else {
-      setUsers((data || []).map(normalizeUser));
+      setUsers((data.users || []).map(normalizeUser));
       setError(null);
     }
   }

@@ -1,6 +1,6 @@
-const dotenv = require('dotenv');
-const fs = require('fs');
-const path = require('path');
+import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config({ path: '.env.local' });
 

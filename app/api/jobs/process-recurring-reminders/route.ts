@@ -22,15 +22,14 @@ function addOneYear(dateValue: Date) {
   return date;
 }
 
-function getNextBirthdayRunAt(birthdate: string, sendTime: string | null | undefined) {
+function getNextBirthdayRunAt(birthdate: string) {
   const birth = new Date(birthdate);
   if (Number.isNaN(birth.getTime())) {
     return null;
   }
 
-  const [hours, minutes, seconds] = String(sendTime || '09:00:00').split(':').map((part) => Number(part || 0));
   const now = new Date();
-  const candidate = new Date(now.getFullYear(), birth.getMonth(), birth.getDate(), hours || 0, minutes || 0, seconds || 0, 0);
+  const candidate = new Date(now.getFullYear(), birth.getMonth(), birth.getDate(), 0, 0, 0, 0);
 
   if (candidate < new Date()) {
     candidate.setFullYear(candidate.getFullYear() + 1);
@@ -110,7 +109,7 @@ export async function POST(req: Request) {
     }
 
     const dueResult = await pool.query(
-      `SELECT r.reminderid, r.clientid, r.companyid, r.remindermethod, r.nextrunat, r.lastsentat, r.sendtime,
+      `SELECT r.reminderid, r.clientid, r.companyid, r.remindermethod, r.nextrunat, r.lastsentat,
               c.email, c.phone, c.firstname, c.lastname, c.birthdate
        FROM reminders r
        JOIN clients c ON c.clientid = r.clientid
@@ -128,7 +127,7 @@ export async function POST(req: Request) {
     let failed = 0;
 
     for (const row of dueResult.rows) {
-      const nextRunAt = row.nextrunat ? new Date(row.nextrunat) : getNextBirthdayRunAt(row.birthdate, row.sendtime);
+      const nextRunAt = row.nextrunat ? new Date(row.nextrunat) : getNextBirthdayRunAt(row.birthdate);
       if (!nextRunAt) {
         console.log('process-recurring-reminders skipped reminder', {
           reminderId: row.reminderid,
@@ -189,21 +188,17 @@ export async function POST(req: Request) {
 
           await pool.query(
             `INSERT INTO messages (
-              reminderid, companyid, channel, subject, messagebody,
-              attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+              reminderid, companyid, channel, subject, messagebody, status, sentat
+            ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
             ON CONFLICT (reminderid) DO UPDATE SET
               companyid = EXCLUDED.companyid,
               channel = EXCLUDED.channel,
               subject = EXCLUDED.subject,
               messagebody = EXCLUDED.messagebody,
-              attachmenturl = EXCLUDED.attachmenturl,
-              attachmentfilename = EXCLUDED.attachmentfilename,
-              attachmentmimetype = EXCLUDED.attachmentmimetype,
               status = EXCLUDED.status,
               sentat = EXCLUDED.sentat,
               updatedat = NOW()`,
-            [row.reminderid, row.companyid, 'Email', renderedSubject, renderedBody, null, null, null, 'Sent']
+            [row.reminderid, row.companyid, 'Email', renderedSubject, renderedBody, 'Sent']
           );
 
           console.log('process-recurring-reminders message row marked sent', {

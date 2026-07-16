@@ -35,7 +35,7 @@ function getTokenPayload(req: NextRequest) {
   }
 
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as any;
+    return jwt.verify(token, process.env.JWT_SECRET!) as { role?: string } | string;
   } catch {
     return null;
   }
@@ -56,11 +56,11 @@ export function proxy(req: NextRequest) {
       return NextResponse.redirect(new URL("/login?reason=expired", req.url));
     }
 
-    if (pathname.startsWith("/companies") && !isPrivilegedRole(payload.role)) {
+    if (pathname.startsWith("/companies") && !isPrivilegedRole(typeof payload === "string" ? payload : payload.role)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (pathname.startsWith("/users") && !isPrivilegedRole(payload.role)) {
+    if (pathname.startsWith("/users") && !isPrivilegedRole(typeof payload === "string" ? payload : payload.role)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
   }

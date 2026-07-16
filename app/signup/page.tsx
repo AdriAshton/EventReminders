@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Box, Button, Card, CardContent, TextField, Typography } from "@mui/material";
-import { signup } from "@/services/auth";
+import { signup, type SignupResponse } from "@/services/auth";
 
 function SignupContent() {
   const searchParams = useSearchParams();
@@ -20,10 +20,10 @@ function SignupContent() {
 
   useEffect(() => {
     if (isInviteFlow) {
-      setMessage("Invite detected. Complete your account to join the company.");
-    } else {
-      setMessage("Create your company and become the first administrator.");
+      setMessage((current) => current || "Invite detected. Complete your account to join the company.");
+      return;
     }
+    setMessage((current) => current || "Create your company and become the first administrator.");
   }, [isInviteFlow]);
 
   async function handleSubmit() {
@@ -53,7 +53,7 @@ function SignupContent() {
           }),
         });
 
-        const data = await res.json();
+        const data = (await res.json()) as SignupResponse;
         if (!res.ok) {
           throw new Error(data.error || "Failed to accept invite");
         }
@@ -70,8 +70,8 @@ function SignupContent() {
       );
       setMessage(result?.message || "Account created successfully");
       window.location.assign("/dashboard");
-    } catch (err: any) {
-      setError(err?.message || "Signup failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
       setIsSubmitting(false);
     }

@@ -1,4 +1,4 @@
 declare module 'speakeasy' {
-  const whatever: any;
-  export = whatever;
+  const speakeasy: unknown;
+  export = speakeasy;
 }

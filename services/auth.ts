@@ -41,3 +41,8 @@ export async function login(email: string, password: string) {
   // You’ll typically get back a JWT token here
   return data;
 }
+
+export type SignupResponse = {
+  message?: string;
+  error?: string;
+};

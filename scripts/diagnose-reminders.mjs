@@ -10,8 +10,8 @@ console.log('Current UTC:', new Date().toISOString());
 
 // Check exactly what the job query sees
 const r = await pool.query(
-  `SELECT r.reminderid, r.clientid, r.companyid, r.remindermethod, r.status,
-          r.isactive, r.nextrunat, r.lastsentat, r.sendtime,
+    `SELECT r.reminderid, r.clientid, r.companyid, r.remindermethod, r.status,
+      r.isactive, r.nextrunat, r.lastsentat,
           c.email, c.firstname, c.lastname, c.birthdate
    FROM reminders r
    JOIN clients c ON c.clientid = r.clientid

@@ -74,16 +74,12 @@ export async function POST(req: Request) {
 
     const result = await pool.query(
       `INSERT INTO messages (
-        reminderid, channel, subject, messagebody,
-        attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        reminderid, channel, subject, messagebody, status, sentat
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (reminderid) DO UPDATE SET
         channel = EXCLUDED.channel,
         subject = EXCLUDED.subject,
         messagebody = EXCLUDED.messagebody,
-        attachmenturl = EXCLUDED.attachmenturl,
-        attachmentfilename = EXCLUDED.attachmentfilename,
-        attachmentmimetype = EXCLUDED.attachmentmimetype,
         status = EXCLUDED.status,
         sentat = EXCLUDED.sentat,
         updatedat = NOW()
@@ -93,9 +89,6 @@ export async function POST(req: Request) {
         channel,
         subject || null,
         messageBody,
-        null,
-        null,
-        null,
         status || "Draft",
         sentAt || null,
       ]
@@ -138,21 +131,15 @@ export async function PUT(req: Request) {
         channel = $2,
         subject = $3,
         messagebody = $4,
-        attachmenturl = $5,
-        attachmentfilename = $6,
-        attachmentmimetype = $7,
-        status = $8,
-        sentat = $9,
+        status = $5,
+        sentat = $6,
         updatedat = NOW()
-      WHERE messageid = $10`,
+      WHERE messageid = $7`,
       [
         reminderId,
         channel,
         subject || null,
         messageBody,
-        null,
-        null,
-        null,
         status || "Draft",
         sentAt || null,
         messageid,

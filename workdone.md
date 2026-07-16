@@ -1,3 +1,11 @@
+# Live database verification
+
+- Verified the provided Neon production database connection reaches `neondb` as `neondb_owner`.
+- Confirmed `company_settings` already includes the credential columns added by migration `019_add_company_settings_credentials.sql`.
+- Confirmed the audit tables exist in the live schema as lowercase tables: `clientaudit`, `companyaudit`, `messageaudit`, `reminderaudit`, and `useraudit`.
+- No migration history table was present in the live database, so applied migrations could not be enumerated directly.
+- No live schema changes were made during verification.
+
 # Work Done Log
 
 Last updated: 2026-07-14

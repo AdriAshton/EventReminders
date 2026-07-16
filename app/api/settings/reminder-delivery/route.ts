@@ -53,29 +53,20 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const sendTime = parseTime(body?.sendTime);
     const channel = parseChannel(body?.channel);
 
-    if (!sendTime) {
-      return NextResponse.json({ error: 'Send time must be in HH:MM format' }, { status: 400 });
-    }
     if (!channel) {
       return NextResponse.json({ error: 'Channel must be Email or WhatsApp' }, { status: 400 });
     }
 
-    const reminderDelivery = { sendTime, channel };
+    const reminderDelivery = { channel };
     await upsertCompanySettings(companyId, { reminderdelivery: reminderDelivery as any });
 
     await pool.query(
       `UPDATE reminders
-       SET sendtime = $1,
-           remindermethod = $2,
-           nextrunat = CASE
-             WHEN nextrunat IS NULL THEN nextrunat
-             ELSE date_trunc('day', nextrunat) + $1::time
-           END
-       WHERE companyid = $3`,
-      [sendTime, channel, companyId]
+       SET remindermethod = $1
+       WHERE companyid = $2`,
+      [channel, companyId]
     );
 
     await pool.query(

@@ -1,5 +1,25 @@
 import { authenticatedFetch } from "@/lib/authClient";
 
+export type UserRecord = {
+  userid: number;
+  username: string;
+  email: string;
+  roleid?: number;
+  role?: string;
+  password?: string;
+  confirmPassword?: string;
+};
+
+export type UserListResponse = {
+  error?: string;
+  users?: UserRecord[];
+};
+
+export type UserMutationResponse = {
+  error?: string;
+  message?: string;
+};
+
 export async function getUsers() {
   const res = await authenticatedFetch("/api/users", {
     method: "GET",

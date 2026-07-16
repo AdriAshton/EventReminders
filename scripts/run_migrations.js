@@ -1,8 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const { Client } = require('pg');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+import fs from 'fs';
+import path from 'path';
+import { Client } from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 const DATABASE_URL = process.env.DATABASE_URL;

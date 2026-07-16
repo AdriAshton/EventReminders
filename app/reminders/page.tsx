@@ -66,27 +66,11 @@ export default function RemindersPage() {
     return `${year}-${month}-${day}`;
   }
 
-  function formatSendDateTime(scheduleDate: string | Date | null | undefined, sendTime?: string | null) {
+  function formatSendDateTime(scheduleDate: string | Date | null | undefined) {
     if (!scheduleDate) return "";
 
     const date = new Date(scheduleDate);
-    if (Number.isNaN(date.getTime())) return String(scheduleDate);
-
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const year = date.getFullYear();
-    const timeSource = typeof sendTime === "string" && /^\d{2}:\d{2}(?::\d{2})?$/.test(sendTime)
-      ? sendTime.slice(0, 5)
-      : `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-    const [hoursPart, minutesPart] = timeSource.split(":");
-    const hoursNumber = Number(hoursPart);
-    const amPm = Number.isNaN(hoursNumber) ? "" : hoursNumber >= 12 ? "PM" : "AM";
-    const displayHours = Number.isNaN(hoursNumber)
-      ? hoursPart
-      : String(((hoursNumber + 11) % 12) + 1).padStart(2, "0");
-    const timeValue = `${displayHours}:${minutesPart} ${amPm}`.trim();
-
-    return `${month}-${day}-${year} ${timeValue}`;
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   }
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
@@ -437,7 +421,7 @@ export default function RemindersPage() {
                 </TableCell>
                 <TableCell>{[reminder.firstname, reminder.lastname].filter(Boolean).join(" ") || `Client ${reminder.clientid}`}</TableCell>
                 <TableCell>{formatDate(reminder.birthdate)}</TableCell>
-                <TableCell>{formatSendDateTime(reminder.nextrunat, reminder.sendtime)}</TableCell>
+                <TableCell>{formatSendDateTime(reminder.nextrunat)}</TableCell>
                 <TableCell>{getReminderMessage(reminder.reminderid)?.channel || "Email"}</TableCell>
                 <TableCell>{reminder.status}</TableCell>
               </TableRow>
@@ -458,7 +442,7 @@ export default function RemindersPage() {
                 <Typography><strong>Client ID:</strong> {previewReminder.clientid}</Typography>
                 <Typography><strong>Recipient Email:</strong> {previewReminder.email || "No email on file"}</Typography>
                 <Typography><strong>Birthday Date:</strong> {formatDate(previewReminder.birthdate)}</Typography>
-                <Typography><strong>Schedule Date:</strong> {formatSendDateTime(previewReminder.nextrunat, previewReminder.sendtime)}</Typography>
+                <Typography><strong>Schedule Date:</strong> {formatSendDateTime(previewReminder.nextrunat)}</Typography>
                 <Typography><strong>Channel:</strong> {getReminderMessage(previewReminder.reminderid)?.channel || "Email"}</Typography>
               </Paper>
 

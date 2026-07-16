@@ -1,5 +1,20 @@
 import { authenticatedFetch } from "@/lib/authClient";
 
+export type CompanyInviteRecord = {
+  inviteid: number;
+  email: string;
+  status?: string;
+  companyname?: string;
+  companyid?: number;
+  roleid?: number;
+};
+
+export type CompanyInviteResponse = {
+  error?: string;
+  invites?: CompanyInviteRecord[];
+  message?: string;
+};
+
 export async function getCompanyInvites() {
   const res = await authenticatedFetch("/api/company-invites", { method: "GET" });
   const data = await res.json();

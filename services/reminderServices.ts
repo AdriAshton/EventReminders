@@ -55,7 +55,6 @@ export async function addReminder(reminder: {
   reminderdatetime?: Date;
   remindermethod: string;   // e.g. "Email", "SMS"
   status?: string;          // optional, defaults to "Pending"
-  sendtime?: string;
   isactive?: boolean;
 }) {
   const res = await authenticatedFetch("/api/reminders", {
@@ -80,7 +79,6 @@ export async function updateReminder(reminder: {
   reminderdatetime?: Date;
   remindermethod: string;
   status: string;
-  sendtime?: string;
   isactive?: boolean;
 }) {
   const res = await authenticatedFetch("/api/reminders", {
