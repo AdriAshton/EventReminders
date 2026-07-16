@@ -247,7 +247,6 @@ export default function CompaniesPage() {
         Companies
       </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          This screen shows the list of companies with quick access to view and manage each record.
         </Typography>
 
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>

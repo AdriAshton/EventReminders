@@ -6,6 +6,7 @@ export type UserRecord = {
   email: string;
   roleid?: number;
   role?: string;
+  rolename?: string;
   password?: string;
   confirmPassword?: string;
 };

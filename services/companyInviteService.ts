@@ -7,6 +7,7 @@ export type CompanyInviteRecord = {
   companyname?: string;
   companyid?: number;
   roleid?: number;
+  token?: string;
 };
 
 export type CompanyInviteResponse = {
