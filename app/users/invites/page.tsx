@@ -105,19 +105,17 @@ export default function InvitePage() {
 
   return (
     <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
-      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 2, gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ mb: 0.5 }}>
-            Send Company Invite
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Invite teammates and track invite status in one place.
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h4" sx={{ mb: 0.5 }}>
+          Send Company Invite
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Invite teammates and track invite status in one place.
+        </Typography>
         <Button variant="outlined" onClick={() => router.push("/dashboard")}>
           Back
         </Button>
-      </Stack>
+      </Box>
 
       <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 0.6fr" }, mb: 3 }}>
         <Card>
