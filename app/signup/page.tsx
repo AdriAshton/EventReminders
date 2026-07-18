@@ -9,6 +9,7 @@ function SignupContent() {
   const searchParams = useSearchParams();
   const invite = searchParams?.get("invite") || "";
   const [email, setEmail] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -21,6 +22,22 @@ function SignupContent() {
   useEffect(() => {
     if (isInviteFlow) {
       setMessage((current) => current || "Invite detected. Complete your account to join the company.");
+      if (invite) {
+        void (async () => {
+          try {
+            const res = await fetch(`/api/company-invites?invite=${encodeURIComponent(invite)}`);
+            const data = await res.json();
+            const inviteRecord = Array.isArray(data) ? data.find((entry) => String(entry?.token || "") === invite) : null;
+            if (inviteRecord?.email) {
+              const resolvedEmail = String(inviteRecord.email).trim();
+              setInviteEmail(resolvedEmail);
+              setEmail(resolvedEmail);
+            }
+          } catch {
+            // Leave the field editable if the invite lookup fails.
+          }
+        })();
+      }
       return;
     }
     setMessage((current) => current || "Create your company and become the first administrator.");
@@ -95,13 +112,17 @@ function SignupContent() {
           {!isInviteFlow && (
             <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />
           )}
-          <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth margin="normal" />
+          <TextField
+            label="Email"
+            value={isInviteFlow ? inviteEmail || email : email}
+            onChange={(e) => setEmail(e.target.value)}
+            fullWidth
+            margin="normal"
+            slotProps={isInviteFlow ? { input: { readOnly: true } } : undefined}
+          />
           <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
           {!isInviteFlow && (
             <TextField label="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} fullWidth margin="normal" />
-          )}
-          {isInviteFlow && (
-            <TextField label="Invite Token" value={invite} fullWidth margin="normal" disabled />
           )}
           <Button variant="contained" fullWidth sx={{ mt: 2 }} onClick={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? "Creating..." : "Continue"}

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
 import { getCompanySettings } from '@/lib/appSettings';
 import { renderTemplate } from '@/lib/messageTemplates';
+import { getServerEnv } from '@/lib/serverEnv';
 
 function verifyToken(req: Request) {
   const authHeader = req.headers.get('authorization');
@@ -10,7 +11,8 @@ function verifyToken(req: Request) {
     throw new Error('Unauthorized');
   }
   const token = authHeader.split(' ')[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function formatEventDate(eventDate: string | Date | null | undefined) {

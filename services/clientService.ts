@@ -25,8 +25,8 @@ export async function getClients(page = 1, pageSize = 10, filters?: { firstname?
   return data;
 }
 
-export async function getClientFilterValues() {
-  const res = await authenticatedFetch("/api/clients?distinct=1", {
+export async function getClientFilterValues(query?: URLSearchParams) {
+  const res = await authenticatedFetch(`/api/clients?${query?.toString() || "distinct=1"}`, {
     method: "GET",
   });
   const data = await res.json();

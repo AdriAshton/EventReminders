@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import pool from "@/lib/db";
 import { sendEmail } from '@/lib/email';
+import { getServerEnv } from '@/lib/serverEnv';
 
 export async function POST(req: Request) {
   const { email, password } = await req.json();
   const loginEmail = String(email || '').trim();
+  const { default: pool } = await import("@/lib/db");
 
   const result = await pool.query(
     `SELECT u.userid, u.companyid, u.username, u.passwordhash, u.email, u.roleid, u.settings,
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
     const html = `<p>Your verification code is: <strong>${code}</strong>. It expires in 5 minutes.</p>`;
 
     try {
-      await sendEmail({ to: loginEmail || user.email, subject, text, html });
+      await sendEmail({ to: loginEmail || user.email, subject, text, html }, user.companyid);
     } catch (err) {
       console.error('Error sending 2FA code', err);
       console.log(`2FA code for ${user.email}: ${code}`);
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
   }
 
   // ✅ Issue JWT
-  const jwtSecret = process.env.JWT_SECRET;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
   if (!jwtSecret) {
     console.error('Missing JWT_SECRET');
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });

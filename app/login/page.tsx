@@ -33,7 +33,7 @@ export default function LoginPage() {
       const data = await login(form.email, form.password);
       if (data.twoFactorRequired) {
         // Show TOTP input
-        setSuccess('Two-factor required. Enter code below.');
+        setSuccess('A verification code was sent to your email. Enter the code below.');
         setPreAuthUserId(String(data.userid || ''));
         return;
       }
@@ -71,7 +71,7 @@ export default function LoginPage() {
     <Box sx={{ display: "flex", justifyContent: "center", mt: 5 }}>
       <Card sx={{ width: 400 }}>
         <CardContent>
-          <Typography variant="h5" gutterBottom>
+          <Typography variant="h5" gutterBottom sx={{ color: "#000" }}>
             Log In
           </Typography>
           <form onSubmit={handleSubmit}>
@@ -84,6 +84,10 @@ export default function LoginPage() {
               fullWidth
               margin="normal"
               required
+              slotProps={{
+                inputLabel: { sx: { color: "#000" } },
+                input: { sx: { color: "#000" } },
+              }}
             />
             <TextField
               label="Password"
@@ -94,14 +98,18 @@ export default function LoginPage() {
               fullWidth
               margin="normal"
               required
+              slotProps={{
+                inputLabel: { sx: { color: "#000" } },
+                input: { sx: { color: "#000" } },
+              }}
             />
             {error && (
-              <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              <Typography color="error" variant="body2" sx={{ mt: 1, color: "#000" }}>
                 {error}
               </Typography>
             )}
             {success && (
-              <Typography color="primary" variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: "#000" }}>
                 {success}
               </Typography>
             )}
@@ -125,7 +133,14 @@ export default function LoginPage() {
                   onChange={(e) => setTotp(e.target.value)}
                   fullWidth
                   margin="normal"
-                  {...({ inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } } as any)}
+                  slotProps={{
+                    inputLabel: { sx: { color: "#000" } },
+                    input: { sx: { color: "#000" } },
+                    htmlInput: {
+                      inputMode: 'numeric',
+                      pattern: '[0-9]*',
+                    },
+                  }}
                 />
                 <Button variant="outlined" fullWidth onClick={handleVerifyTotp} sx={{ mt: 1 }}>
                   Continue
@@ -133,19 +148,19 @@ export default function LoginPage() {
               </Box>
             )}
           </form>
-          <Typography variant="body2" sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ mt: 2, color: "#000" }}>
             Account access is managed by your administrator.
           </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
+          <Typography variant="body2" sx={{ mt: 1, color: "#000" }}>
             <Link
               href="/forgot"
               sx={{
-                color: "primary.main",
+                color: "#000",
                 fontWeight: 600,
                 textDecoration: "none",
                 transition: "color 0.2s ease, text-decoration-color 0.2s ease",
                 "&:hover": {
-                  color: "primary.dark",
+                  color: "#222",
                   textDecoration: "underline",
                 },
               }}

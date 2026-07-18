@@ -34,16 +34,16 @@ Use this file to track manual testing as you go through each screen in the app.
 - [x] Confirm only administrator/owner access is allowed
 - [x] Confirm loading indicator shows while fetching
 - [x] Confirm empty state shows when no companies exist
-- [ ] Confirm add company works for owner
-- [ ] Confirm edit company works for owner
-- [ ] Confirm delete company works for owner
-- [ ] Confirm view-only access works for administrator
+- [x] Confirm add company works for owner
+- [x] Confirm edit company works for owner
+- [x] Confirm delete company works for owner
+- [x] Confirm view-only access works for administrator
 
 ## Users
-- [ ] Open the users screen
-- [ ] Confirm the table loads
-- [ ] Confirm loading indicator shows while fetching
-- [ ] Confirm empty state shows when no users exist
+- [x] Open the users screen
+- [x] Confirm the table loads
+- [x] Confirm loading indicator shows while fetching
+- [x] Confirm empty state shows when no users exist
 - [ ] Confirm filters work
 - [ ] Confirm view/edit works
 - [ ] Confirm delete works
@@ -58,15 +58,15 @@ Use this file to track manual testing as you go through each screen in the app.
 - [ ] Confirm invite status updates after sending
 
 ## Messages
-- [ ] Open the messages screen
-- [ ] Confirm the table loads
-- [ ] Confirm loading indicator shows while fetching
-- [ ] Confirm empty state shows when no messages exist
-- [ ] Confirm add message works
-- [ ] Confirm edit message works
-- [ ] Confirm delete message works
-- [ ] Confirm template preview works
-- [ ] Confirm pagination works
+- [x] Open the messages screen
+- [x] Confirm the table loads
+- [x] Confirm loading indicator shows while fetching
+- [x] Confirm empty state shows when no messages exist
+- [x] Confirm add message works
+- [x] Confirm edit message works
+- [x] Confirm delete message works
+- [x] Confirm template preview works
+- [x] Confirm pagination works
 
 ## Reminders
 - [ ] Open the reminders screen
@@ -80,19 +80,19 @@ Use this file to track manual testing as you go through each screen in the app.
 - [ ] Confirm pagination works
 
 ## Templates
-- [ ] Open the templates screen
-- [ ] Confirm the page loads
-- [ ] Confirm loading indicator shows while fetching
-- [ ] Confirm empty state behavior is correct
-- [ ] Confirm create template works
-- [ ] Confirm edit template works
-- [ ] Confirm delete template works
-- [ ] Confirm default template selection works
+- [x] Open the templates screen
+- [x] Confirm the page loads
+- [x] Confirm loading indicator shows while fetching
+- [x] Confirm empty state behavior is correct
+- [x] Confirm create template works
+- [x] Confirm edit template works
+- [x] Confirm delete template works
+- [x] Confirm default template selection works
 
 ## Settings
-- [ ] Open the settings screen
-- [ ] Confirm settings load correctly
-- [ ] Confirm email settings screen loads
+- [x] Open the settings screen
+- [x] Confirm settings load correctly
+- [x] Confirm email settings screen loads
 - [ ] Confirm 2FA settings screen loads
 - [ ] Confirm saving settings works
 

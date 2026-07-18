@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
 import { sendEmail } from '@/lib/email';
+import { getServerEnv } from '@/lib/serverEnv';
 
 // Helper: verify token
 function verifyToken(req: Request) {
@@ -10,7 +11,8 @@ function verifyToken(req: Request) {
     throw new Error("Unauthorized");
   }
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function getCompanyId(decoded: any) {

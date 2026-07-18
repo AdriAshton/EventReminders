@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { getServerEnv } from '@/lib/serverEnv';
 
 type AuthTokenPayload = {
   userid?: number | string;
@@ -15,7 +16,8 @@ function verifyToken(req: Request) {
   }
 
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as AuthTokenPayload;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as AuthTokenPayload;
 }
 
 export async function GET(req: Request) {
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
     const inviteLink = `${process.env.APP_URL || "http://localhost:3000"}/signup?invite=${token}`;
     try {
       await sendEmail({
-        to: email,
+        to: email.toLowerCase(),
         subject: "You are invited to join the company",
         text: `You have been invited to join. Open this link: ${inviteLink}`,
         html: `<p>You have been invited to join. Open this link:</p><p><a href="${inviteLink}">${inviteLink}</a></p>`,

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const { email } = await req.json();
     if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-    const userRes = await pool.query(`SELECT userid, email, settings FROM users WHERE email = $1 LIMIT 1`, [email.trim()]);
+    const userRes = await pool.query(`SELECT userid, companyid, email, settings FROM users WHERE email = $1 LIMIT 1`, [email.trim()]);
     const user = userRes.rows[0];
     if (!user) return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
 
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         subject: 'Password reset instructions',
         text: `Reset your password: ${link}`,
         html: `<p>Reset your password: <a href="${link}">${link}</a></p>`,
-      });
+      }, user.companyid);
       return NextResponse.json({ message: "If that email exists we'll send reset instructions." });
     } catch (e) {
       console.error('Email send error', e);

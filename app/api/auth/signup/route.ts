@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
-import pool from "@/lib/db"; // adjust path if your db connection is elsewhere
 
 export async function POST(req: Request) {
   const { username, email, password } = await req.json();
@@ -14,6 +13,8 @@ export async function POST(req: Request) {
   }
 
   try {
+    const { default: pool } = await import("@/lib/db");
+
     // ✅ Hash the password before saving
     const hash = await bcrypt.hash(password, 10);
 

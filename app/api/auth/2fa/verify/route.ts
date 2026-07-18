@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import speakeasy from 'speakeasy';
 import jwt from 'jsonwebtoken';
+import { getServerEnv } from '@/lib/serverEnv';
 
 export async function POST(req: Request) {
   try {
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
         if (!role || !user.roleid) {
           return NextResponse.json({ error: 'A valid role is required to log in' }, { status: 403 });
         }
-        const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+        const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+        const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, jwtSecret, { expiresIn: '30m' });
         return NextResponse.json({ verified: true, token: jwtToken });
       }
       // fallthrough to TOTP check if code mismatches or expired
@@ -59,7 +61,8 @@ export async function POST(req: Request) {
     if (!role || !user.roleid) {
       return NextResponse.json({ error: 'A valid role is required to log in' }, { status: 403 });
     }
-    const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+    const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+    const jwtToken = jwt.sign({ userid: user.userid, companyid: user.companyid, roleid: user.roleid, role, username: user.username }, jwtSecret, { expiresIn: '30m' });
 
     return NextResponse.json({ verified: true, token: jwtToken });
   } catch (err: any) {

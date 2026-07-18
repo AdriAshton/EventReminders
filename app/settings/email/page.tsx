@@ -9,6 +9,7 @@ import {
   CardActionArea,
   CardContent,
   Chip,
+  CircularProgress,
   FormControlLabel,
   Snackbar,
   Stack,
@@ -219,6 +220,17 @@ export default function EmailSettingsPage() {
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
+      )}
+
+      {loading && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 1 }}>
+              <CircularProgress size={24} />
+              <Typography color="text.secondary">Loading email settings...</Typography>
+            </Box>
+          </CardContent>
+        </Card>
       )}
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={3}>

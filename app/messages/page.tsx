@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   Stack,
   Divider,
   MenuItem,
@@ -45,6 +46,7 @@ export default function MessagesPage() {
   const [activeTemplateImage, setActiveTemplateImage] = useState("");
   const [templatePreview, setTemplatePreview] = useState<{ subject: string; body: string; values: Record<string, string> } | null>(null);
   const [renderingTemplate, setRenderingTemplate] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [pkFilter, setPkFilter] = useState<number | string>("");
   const [fkFilter, setFkFilter] = useState<number | string>("");
   const [page, setPage] = useState(1);
@@ -76,6 +78,7 @@ export default function MessagesPage() {
   }, []);
 
   async function loadMessages(pageParam: number = page) {
+    setLoading(true);
     const data = await getMessages(pageParam, pageSize);
     if (data.error) {
       setError(data.error);
@@ -84,18 +87,23 @@ export default function MessagesPage() {
       setTotal(data.total || 0);
       setError(null);
     }
+
+    setLoading(false);
   }
 
   async function loadTemplates() {
+    setLoading(true);
     const data = await getMessageTemplates();
     if ("error" in data) {
       setError(data.error);
+      setLoading(false);
       return;
     }
 
     setTemplates(data.templates || []);
     setSelectedTemplateId(data.activeTemplateId || data.template?.id || "");
     setActiveTemplateImage(data.template?.imageUrl || "");
+    setLoading(false);
   }
 
   async function handlePreviewTemplate() {
@@ -291,6 +299,14 @@ export default function MessagesPage() {
       <Divider sx={{ my: 2 }} />
 
       <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
+        {loading && (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ ml: 2 }} color="text.secondary">
+              Loading messages...
+            </Typography>
+          </Box>
+        )}
         <Table>
           <TableHead>
             <TableRow>
@@ -303,9 +319,16 @@ export default function MessagesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {messages
-              .filter((m) => (pkFilter === "" ? true : m.messageid === pkFilter))
-              .map((message) => (
+            {!loading && messages.filter((m) => (pkFilter === "" ? true : m.messageid === pkFilter)).length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                  No messages to display.
+                </TableCell>
+              </TableRow>
+            ) : (
+              messages
+                .filter((m) => (pkFilter === "" ? true : m.messageid === pkFilter))
+                .map((message) => (
               <TableRow
                 key={message.messageid}
                 hover
@@ -355,7 +378,8 @@ export default function MessagesPage() {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

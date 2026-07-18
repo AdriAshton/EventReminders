@@ -9,7 +9,10 @@ import {
   CardContent,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
   MenuItem,
+  Select,
   Snackbar,
   Stack,
   TextField,
@@ -17,6 +20,7 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
+import { getCompanies } from "@/services/CompanyService";
 import { getCompanyInvites, sendCompanyInvite, type CompanyInviteRecord, type CompanyInviteResponse } from "@/services/companyInviteService";
 
 const ROLE_OPTIONS = [
@@ -33,11 +37,15 @@ export default function InvitePage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [roleid, setRoleid] = useState("2");
+  const [companyid, setCompanyid] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [invites, setInvites] = useState<CompanyInviteRecord[]>([]);
   const [mounted, setMounted] = useState(false);
   const [companyId, setCompanyId] = useState<number | null>(null);
+  const [companies, setCompanies] = useState<Array<{ companyid: number; companyname: string }>>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [companyLabel, setCompanyLabel] = useState("");
 
   const pendingCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "pending").length;
   const acceptedCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "accepted").length;
@@ -59,15 +67,49 @@ export default function InvitePage() {
 
     const payload = getTokenPayload(token);
     const resolvedCompanyId = Number(payload?.companyid);
+    const resolvedRole = String(payload?.role || "").toLowerCase();
     if (!Number.isFinite(resolvedCompanyId) || resolvedCompanyId <= 0) {
       setError("Unable to determine your company ID from the current session");
       return;
     }
 
     setCompanyId(resolvedCompanyId);
+    setCompanyid(String(resolvedCompanyId));
+    setIsOwner(resolvedRole === "owner");
+    setCompanyLabel(String(payload?.companyname || ""));
 
+    void loadCompanies(resolvedRole === "owner", resolvedCompanyId, String(payload?.companyname || ""));
     void loadInvites();
   }, [mounted, router]);
+
+  async function loadCompanies(ownerMode: boolean, currentCompanyId: number, fallbackCompanyName: string) {
+    const data = await getCompanies(!ownerMode);
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
+
+    if (ownerMode) {
+      setCompanies(Array.isArray(data) ? data : []);
+      return;
+    }
+
+    const currentCompany = data && typeof data === "object" ? data as { companyid?: number; companyname?: string } : null;
+    const resolvedCompany = currentCompany && Number(currentCompany.companyid) === Number(currentCompanyId)
+      ? currentCompany
+      : null;
+
+    if (resolvedCompany) {
+      setCompanies([resolvedCompany]);
+      setCompanyid(String(resolvedCompany.companyid));
+      setCompanyLabel(resolvedCompany.companyname || fallbackCompanyName || "");
+      return;
+    }
+
+    setCompanies([]);
+    setCompanyid(String(currentCompanyId || ""));
+    setCompanyLabel(fallbackCompanyName || "");
+  }
 
   async function loadInvites() {
     const data = (await getCompanyInvites()) as CompanyInviteResponse;
@@ -82,13 +124,14 @@ export default function InvitePage() {
     setError("");
     setStatus("");
 
-    if (!companyId || !email.trim() || !roleid.trim()) {
-      setError("Email and role are required");
+    const resolvedCompanyId = Number(companyid);
+    if (!resolvedCompanyId || !email.trim() || !roleid.trim()) {
+      setError("Company, email and role are required");
       return;
     }
 
     const res = await sendCompanyInvite({
-      companyid: companyId,
+      companyid: resolvedCompanyId,
       email: email.trim(),
       roleid: Number(roleid),
     });
@@ -129,6 +172,37 @@ export default function InvitePage() {
                 onChange={(e) => setEmail(e.target.value)}
                 fullWidth
               />
+              <FormControl fullWidth>
+                <InputLabel id="company-select-label">Company</InputLabel>
+                <Select
+                  labelId="company-select-label"
+                  label="Company"
+                  value={companyid}
+                  displayEmpty
+                  onChange={(e) => setCompanyid(String(e.target.value))}
+                  renderValue={(selected) => {
+                    if (!selected) {
+                      return <span style={{ color: "rgba(0, 0, 0, 0.6)" }}>Select a company</span>;
+                    }
+
+                    if (companyLabel) return companyLabel;
+
+                    const selectedCompany = companies.find((company) => String(company.companyid) === String(selected));
+                    if (selectedCompany?.companyname) return selectedCompany.companyname;
+
+                    return <span style={{ color: "rgba(0, 0, 0, 0.6)" }}>Select a company</span>;
+                  }}
+                >
+                  <MenuItem value="">
+                    Select a company
+                  </MenuItem>
+                  {companies.map((company) => (
+                    <MenuItem key={company.companyid} value={String(company.companyid)}>
+                      {company.companyname}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 select
                 label="Role"

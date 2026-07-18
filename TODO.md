@@ -4,7 +4,7 @@
 - [x] Dark mode / theme customization
 - [x] Change password from login screen (with email confirmation)
 - [x] Two-factor authentication (2FA)
-- [ ] Update UI for user friendliness (dropdowns, templates, customizable message formats, undo delete, security screen)
+- [x] Update UI for user friendliness (dropdowns, templates, customizable message formats, undo delete, security screen)
 - [x] Settings to toggle between dark mode and 2FA authentication
 - [x] Email integration (SendGrid, Nodemailer) Using mailtrap for now
 - [x] Configurable templates for personalized birthday messages

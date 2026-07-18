@@ -25,6 +25,10 @@ export default function AuthSessionManager() {
     window.addEventListener("focus", validate);
     document.addEventListener("visibilitychange", validate);
     window.addEventListener("storage", validate);
+    window.addEventListener("click", validate, true);
+    window.addEventListener("keydown", validate, true);
+    window.addEventListener("mousemove", validate, true);
+    window.addEventListener("scroll", validate, true);
 
     return () => {
       window.clearTimeout(initialTimer);
@@ -32,6 +36,10 @@ export default function AuthSessionManager() {
       window.removeEventListener("focus", validate);
       document.removeEventListener("visibilitychange", validate);
       window.removeEventListener("storage", validate);
+      window.removeEventListener("click", validate, true);
+      window.removeEventListener("keydown", validate, true);
+      window.removeEventListener("mousemove", validate, true);
+      window.removeEventListener("scroll", validate, true);
     };
   }, [pathname]);
 

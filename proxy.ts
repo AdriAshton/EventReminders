@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
+import { getServerEnv } from "@/lib/serverEnv";
 
 const protectedPagePrefixes = [
   "/dashboard",
@@ -29,13 +30,14 @@ function getTokenPayload(req: NextRequest) {
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.split(" ")[1]
     : cookieToken;
+  const jwtSecret = getServerEnv("JWT_SECRET") || "yourSuperSecretKey123";
 
   if (!token) {
     return null;
   }
 
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as { role?: string } | string;
+    return jwt.verify(token, jwtSecret) as { role?: string } | string;
   } catch {
     return null;
   }

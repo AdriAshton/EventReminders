@@ -7,7 +7,12 @@ export async function compressImageFile(file: File, maxWidth = 1200, quality = 0
     return file;
   }
 
-  const imageBitmap = await createImageBitmap(file);
+  let imageBitmap: ImageBitmap;
+  try {
+    imageBitmap = await createImageBitmap(file);
+  } catch {
+    return file;
+  }
   const scale = Math.min(1, maxWidth / imageBitmap.width);
   const width = Math.max(1, Math.round(imageBitmap.width * scale));
   const height = Math.max(1, Math.round(imageBitmap.height * scale));

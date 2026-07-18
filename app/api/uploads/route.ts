@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { put } from "@vercel/blob";
+import { getServerEnv } from '@/lib/serverEnv';
 
 export const runtime = "nodejs";
 
@@ -11,19 +13,35 @@ function verifyToken(req: Request) {
     throw new Error("Unauthorized");
   }
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+async function saveLocalUpload(file: File, fileName: string) {
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "messages");
+  await mkdir(uploadDir, { recursive: true });
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const targetPath = path.join(uploadDir, fileName);
+  await writeFile(targetPath, buffer);
+
+  return `/uploads/messages/${fileName}`;
+}
+
 export async function POST(req: Request) {
   try {
+    const requestUrl = new URL(req.url);
+    const isLocalhostRequest = requestUrl.hostname === "localhost" || requestUrl.hostname === "127.0.0.1";
+
     console.log('uploads route: request received', {
       at: new Date().toISOString(),
       contentType: req.headers.get('content-type'),
       hasAuth: Boolean(req.headers.get('authorization')),
+      isLocalhostRequest,
     });
 
     const formData = await req.formData();
@@ -51,16 +69,41 @@ export async function POST(req: Request) {
     const extension = safeName.split(".").pop() || "bin";
     const fileName = `${Date.now()}-${randomUUID()}-${baseName}.${extension}`;
 
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    const hasBlobCredentials = Boolean(
+      process.env.BLOB_PUBLIC_STORE_ID ||
+      process.env.BLOB_STORE_ID ||
+      process.env.BLOB_READ_WRITE_TOKEN ||
+      process.env.VERCEL_OIDC_TOKEN,
+    );
+
+    if (isLocalhostRequest || (isDevelopment && !hasBlobCredentials)) {
+      const localUrl = await saveLocalUpload(file, fileName);
+      console.log('uploads route: saved locally', {
+        fileName,
+        localUrl,
+      });
+
+      return NextResponse.json({
+        url: localUrl,
+        fileName,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+      });
+    }
+
     console.log('uploads route: uploading to blob', {
       fileName,
       blobPath: `messages/${fileName}`,
     });
 
+    const { put } = await import("@vercel/blob");
+
     const blob = await put(`messages/${fileName}`, file, {
       access: "public",
       contentType: file.type || "application/octet-stream",
       addRandomSuffix: true,
-      storeId: process.env.BLOB_PUBLIC_STORE_ID,
+      storeId: process.env.BLOB_PUBLIC_STORE_ID || process.env.BLOB_STORE_ID,
     });
 
     console.log('uploads route: blob upload complete', {

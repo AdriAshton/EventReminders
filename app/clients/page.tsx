@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -75,6 +76,7 @@ export default function ClientsPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const paginationSelectedColor = {
     purple: "#5b5fe8",
@@ -172,21 +174,29 @@ export default function ClientsPage() {
     return leftText.localeCompare(rightText);
   }
 
-  const firstNameOptions = [...new Set(
-    (filterValues.firstnames || [])
-      .map((value) => String(value || "").trim())
-      .filter(Boolean)
-  )].sort(compareValues);
+  function normalizeText(value: string) {
+    return String(value || "").trim();
+  }
 
-  const lastNameOptions = [...new Set(
-    (filterValues.lastnames || [])
-      .map((value) => String(value || "").trim())
-      .filter(Boolean)
-  )].sort(compareValues);
+  function matchesFirstName(candidate: any) {
+    return firstNameFilter === "" ? true : normalizeText(candidate.firstname) === firstNameFilter;
+  }
+
+  function matchesLastName(candidate: any) {
+    return lastNameFilter === "" ? true : normalizeText(candidate.lastname) === lastNameFilter;
+  }
+
+  function normalizeDistinctValues(values: unknown) {
+    if (!Array.isArray(values)) return [];
+    return [...new Set(values.map((value) => normalizeText(String(value))).filter(Boolean))].sort(compareValues);
+  }
+
+  const firstNameOptions = normalizeDistinctValues(filterValues.firstnames);
+  const lastNameOptions = normalizeDistinctValues(filterValues.lastnames);
 
   const sortedClients = [...clients]
-    .filter((c) => (firstNameFilter === "" ? true : String(c.firstname || "") === firstNameFilter))
-    .filter((c) => (lastNameFilter === "" ? true : String(c.lastname || "") === lastNameFilter))
+    .filter(matchesFirstName)
+    .filter(matchesLastName)
     .sort((left, right) => {
       const firstNameCompare = compareValues(left.firstname, right.firstname);
       const lastNameCompare = compareValues(left.lastname, right.lastname);
@@ -212,16 +222,6 @@ export default function ClientsPage() {
   useEffect(() => {
     loadClients(page);
   }, [page]);
-
-  useEffect(() => {
-    loadClients(1);
-    setPage(1);
-  }, [firstNameFilter, lastNameFilter, pageSize]);
-
-  useEffect(() => {
-    setDraftFirstNameFilter(firstNameFilter);
-    setDraftLastNameFilter(lastNameFilter);
-  }, [firstNameFilter, lastNameFilter]);
 
   useEffect(() => {
     loadFilterValues();
@@ -263,6 +263,7 @@ export default function ClientsPage() {
   }, [clients]);
 
   async function loadClients(pageParam: number = page) {
+    setLoading(true);
     const data = await getClients(pageParam, pageSize, {
       firstname: firstNameFilter,
       lastname: lastNameFilter,
@@ -276,13 +277,21 @@ export default function ClientsPage() {
       setTotal(data.total || 0);
       setError(null);
     }
+
+    setLoading(false);
   }
 
-  async function loadFilterValues() {
-    const data = await getClientFilterValues();
+  async function loadFilterValues(firstName = firstNameFilter, lastName = lastNameFilter) {
+    setLoading(true);
+    const searchParams = new URLSearchParams({ distinct: "1" });
+    if (firstName) searchParams.set("firstname", firstName);
+    if (lastName) searchParams.set("lastname", lastName);
+
+    const data = await getClientFilterValues(searchParams);
 
     if (data.error) {
       setError(data.error);
+      setLoading(false);
       return;
     }
 
@@ -290,6 +299,20 @@ export default function ClientsPage() {
       firstnames: Array.isArray(data.firstnames) ? data.firstnames : [],
       lastnames: Array.isArray(data.lastnames) ? data.lastnames : [],
     });
+
+    setLoading(false);
+  }
+
+  async function loadFilteredClients(firstName: string, lastName: string) {
+    await Promise.all([
+      loadClients(1),
+      loadFilterValues(firstName, lastName),
+    ]);
+    setPage(1);
+  }
+
+  async function refreshFilteredClients(nextFirstName: string, nextLastName: string) {
+    await loadFilteredClients(nextFirstName, nextLastName);
   }
 
   async function handleAdd() {
@@ -473,7 +496,7 @@ export default function ClientsPage() {
   function applyFilters() {
     setFirstNameFilter(draftFirstNameFilter);
     setLastNameFilter(draftLastNameFilter);
-    setPage(1);
+    refreshFilteredClients(draftFirstNameFilter, draftLastNameFilter);
   }
 
   function clearFilters() {
@@ -481,7 +504,21 @@ export default function ClientsPage() {
     setDraftLastNameFilter("");
     setFirstNameFilter("");
     setLastNameFilter("");
-    setPage(1);
+    refreshFilteredClients("", "");
+  }
+
+  function handleFirstNameDraftChange(value: string) {
+    setDraftFirstNameFilter(value);
+    setFirstNameFilter(value);
+    setLastNameFilter(draftLastNameFilter);
+    refreshFilteredClients(value, draftLastNameFilter);
+  }
+
+  function handleLastNameDraftChange(value: string) {
+    setDraftLastNameFilter(value);
+    setFirstNameFilter(draftFirstNameFilter);
+    setLastNameFilter(value);
+    refreshFilteredClients(draftFirstNameFilter, value);
   }
 
   const textFieldProps = {
@@ -685,7 +722,7 @@ export default function ClientsPage() {
               labelId="first-name-filter-label"
               value={draftFirstNameFilter}
               label="First Name"
-              onChange={(e) => setDraftFirstNameFilter(String(e.target.value))}
+              onChange={(e) => handleFirstNameDraftChange(String(e.target.value))}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
@@ -700,7 +737,7 @@ export default function ClientsPage() {
               labelId="last-name-filter-label"
               value={draftLastNameFilter}
               label="Last Name"
-              onChange={(e) => setDraftLastNameFilter(String(e.target.value))}
+              onChange={(e) => handleLastNameDraftChange(String(e.target.value))}
               sx={{ color: '#000', backgroundColor: '#fff' }}
             >
               <MenuItem value="">All</MenuItem>
@@ -717,6 +754,14 @@ export default function ClientsPage() {
       </Box>
 
       <TableContainer component={Paper} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ ml: 2 }} color="text.secondary">
+              Loading clients...
+            </Typography>
+          </Box>
+        )}
         <Table>
           <TableHead>
             <TableRow>
@@ -736,7 +781,14 @@ export default function ClientsPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedClients.map((c) => (
+            {!loading && sortedClients.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                  No clients to display.
+                </TableCell>
+              </TableRow>
+            ) : (
+              sortedClients.map((c) => (
               <TableRow
                 key={c.clientid}
                 hover
@@ -755,7 +807,8 @@ export default function ClientsPage() {
                   <Button onClick={(e) => { e.stopPropagation(); setEditingClient(c); }}>View/Edit</Button>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

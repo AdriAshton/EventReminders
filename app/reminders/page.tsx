@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -86,6 +87,7 @@ export default function RemindersPage() {
   const [previewData, setPreviewData] = useState<{ subject: string; body: string; values: Record<string, string> } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editImageOpen, setEditImageOpen] = useState(false);
   const [editImageMessage, setEditImageMessage] = useState<any | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string>("");
@@ -123,6 +125,7 @@ export default function RemindersPage() {
   }, []);
 
   async function loadReminders(pageParam: number = page, firstName = firstNameFilter, lastName = lastNameFilter) {
+    setLoading(true);
     const data = await getReminders(pageParam, pageSize, firstName, lastName);
 
     if (data.error) {
@@ -132,24 +135,31 @@ export default function RemindersPage() {
       setTotal(data.total || 0);
       setError(null);
     }
+
+    setLoading(false);
   }
 
   async function loadFilterOptions(firstName: string, lastName: string) {
+    setLoading(true);
     const data = await getReminderFilterOptions(firstName, lastName);
     if (!("error" in data)) {
       setFirstNameOptions(data.firstNames || []);
       setLastNameOptions(data.lastNames || []);
     }
+    setLoading(false);
   }
 
   async function loadMessages() {
+    setLoading(true);
     const data = await getMessages(1, 200);
     if (!data.error) {
       setMessages(data.rows || []);
     }
+    setLoading(false);
   }
 
   async function loadTemplates() {
+    setLoading(true);
     const data = await getMessageTemplates();
     if (!("error" in data)) {
       setTemplates(data.templates || []);
@@ -157,6 +167,7 @@ export default function RemindersPage() {
       setActiveTemplateName(data.template?.name || data.templates?.find((template: any) => template.id === (data.activeTemplateId || data.template?.id))?.name || "Default template");
       setPreviewTemplateId(data.activeTemplateId || data.template?.id || "");
     }
+    setLoading(false);
   }
 
   const textFieldProps = {
@@ -373,6 +384,14 @@ export default function RemindersPage() {
       </Box>
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
+        {loading && (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ ml: 2 }} color="text.secondary">
+              Loading reminders...
+            </Typography>
+          </Box>
+        )}
         <Table>
           <TableHead>
             <TableRow>
@@ -395,8 +414,14 @@ export default function RemindersPage() {
           </TableHead>
 
           <TableBody>
-            {reminders
-              .map((reminder) => (
+            {!loading && reminders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                  No reminders to display.
+                </TableCell>
+              </TableRow>
+            ) : (
+              reminders.map((reminder) => (
               <TableRow
                 key={reminder.reminderid}
                 hover
@@ -425,7 +450,8 @@ export default function RemindersPage() {
                 <TableCell>{getReminderMessage(reminder.reminderid)?.channel || "Email"}</TableCell>
                 <TableCell>{reminder.status}</TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -439,7 +465,9 @@ export default function RemindersPage() {
             <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary">Reminder</Typography>
-                <Typography><strong>Client ID:</strong> {previewReminder.clientid}</Typography>
+                <Typography>
+                  <strong>Client Name:</strong> {[previewReminder.firstname, previewReminder.lastname].filter(Boolean).join(" ") || `Client ${previewReminder.clientid}`}
+                </Typography>
                 <Typography><strong>Recipient Email:</strong> {previewReminder.email || "No email on file"}</Typography>
                 <Typography><strong>Birthday Date:</strong> {formatDate(previewReminder.birthdate)}</Typography>
                 <Typography><strong>Schedule Date:</strong> {formatSendDateTime(previewReminder.nextrunat)}</Typography>

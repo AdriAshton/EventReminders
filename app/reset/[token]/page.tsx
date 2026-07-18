@@ -29,7 +29,7 @@ export default function ResetPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4">Reset password</Typography>
+      <Typography variant="h4" sx={{ color: '#000' }}>Reset password</Typography>
       {!token && (
         <Typography color="error" sx={{ mt: 2 }}>No reset token provided in URL.</Typography>
       )}
@@ -41,9 +41,9 @@ export default function ResetPage() {
         onChange={(e) => setPassword(e.target.value)}
         sx={{
           mt: 2,
-          '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.85)' },
-          '& .MuiInputBase-input': { color: 'rgba(255,255,255,0.95)' },
-          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 1 },
+          '& .MuiInputLabel-root': { color: '#000' },
+          '& .MuiInputBase-input': { color: '#000' },
+          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 1 },
         }}
         fullWidth
       />
@@ -55,19 +55,16 @@ export default function ResetPage() {
         onChange={(e) => setConfirmPassword(e.target.value)}
         sx={{
           mt: 2,
-          '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.85)' },
-          '& .MuiInputBase-input': { color: 'rgba(255,255,255,0.95)' },
-          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 1 },
+          '& .MuiInputLabel-root': { color: '#000' },
+          '& .MuiInputBase-input': { color: '#000' },
+          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 1 },
         }}
         fullWidth
       />
 
       <Button variant="contained" sx={{ mt: 2 }} onClick={submit} disabled={!token || !password || !confirmPassword}>Set password</Button>
 
-      {token && process.env.NODE_ENV !== 'production' && (
-        <Typography variant="body2" sx={{ mt: 2 }}>Token (dev): {token}</Typography>
-      )}
-      {msg && <Typography sx={{ mt: 2 }}>{msg}</Typography>}
+      {msg && <Typography sx={{ mt: 2, color: '#000' }}>{msg}</Typography>}
     </Box>
   );
 }

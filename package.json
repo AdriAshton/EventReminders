@@ -8,7 +8,7 @@
     "build:watch": "chokidar \"app/** lib/** pages/**\" -c \"npm run build\" --initial",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "node ./scripts/run_migrations.js",
+    "migrate": "node ./scripts/run_migrations.mjs",
     "process-reminders": "node ./scripts/process_recurring_reminders.js"
   },
   "dependencies": {

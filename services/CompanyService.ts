@@ -3,8 +3,8 @@
 import { authenticatedFetch } from "@/lib/authClient";
 
 // GET all companies (or scoped by JWT depending on backend)
-export async function getCompanies() {
-  const res = await authenticatedFetch("/api/companies", {
+export async function getCompanies(currentOnly = false) {
+  const res = await authenticatedFetch(`/api/companies${currentOnly ? "?current=1" : ""}`, {
     method: "GET",
   });
   const data = await res.json();

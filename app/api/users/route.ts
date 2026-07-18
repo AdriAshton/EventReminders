@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { getServerEnv } from '@/lib/serverEnv';
 
 function verifyToken(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -10,7 +11,8 @@ function verifyToken(req: Request) {
   }
 
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function getCompanyId(decoded: any) {
@@ -27,8 +29,9 @@ export async function GET(req: Request) {
     }
 
     const result = await pool.query(
-      `SELECT u.userid, u.username, u.roleid, r.rolename AS role, u.email
+      `SELECT u.userid, u.username, u.roleid, r.rolename AS role, u.email, c.companyname
        FROM users u
+       JOIN companies c ON c.companyid = u.companyid
        JOIN roles r ON r.roleid = u.roleid
        WHERE u.companyid = $1
        ORDER BY u.userid ASC`,

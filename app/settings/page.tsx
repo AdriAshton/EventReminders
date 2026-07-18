@@ -64,30 +64,18 @@ export default function SettingsPage() {
         setSecurityMessage('No signed-in user found');
         return;
       }
-      const setupRes = await fetch('/api/auth/2fa/setup', {
+      const res = await authenticatedFetch('/api/auth/2fa/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: currentUserId }),
       });
-      const setupData = await setupRes.json();
-      if (!setupRes.ok) {
-        setSecurityMessage(setupData?.error || 'Failed to start 2FA setup');
+      const data = await res.json();
+      if (!res.ok) {
+        setSecurityMessage(data?.error || 'Failed to enable 2FA');
         return;
       }
-      const verifyCode = window.prompt('Enter the 6-digit verification code from your authenticator app');
-      if (!verifyCode) return;
-      const verifyRes = await fetch('/api/auth/2fa/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUserId, token: verifyCode }),
-      });
-      const verifyData = await verifyRes.json();
-      if (verifyData?.verified) {
-        setTwoFactorEnabled(true);
-        setSecurityMessage('2FA enabled for your account');
-      } else {
-        setSecurityMessage(verifyData?.error || 'Invalid verification code');
-      }
+      setTwoFactorEnabled(true);
+      setSecurityMessage('2FA enabled for your account');
     } catch (err: unknown) {
       setSecurityMessage(err instanceof Error ? err.message : 'Failed to enable 2FA');
     }

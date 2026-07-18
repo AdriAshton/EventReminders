@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getCompanySettings } from '@/lib/appSettings';
 import { sendEmail } from '@/lib/email';
+import { getServerEnv } from '@/lib/serverEnv';
 
 type AuthTokenPayload = {
   companyid?: number | string;
@@ -13,7 +14,8 @@ function verifyToken(req: Request) {
     throw new Error('Unauthorized');
   }
   const token = authHeader.split(' ')[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as AuthTokenPayload;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as AuthTokenPayload;
 }
 
 function getCompanyId(decoded: AuthTokenPayload) {

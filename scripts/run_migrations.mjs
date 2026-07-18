@@ -1,13 +1,30 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { Client } from 'pg';
 import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function readEnvValue(filePath, key) {
+  if (!fs.existsSync(filePath)) {
+    return undefined;
+  }
+
+  const envFile = fs.readFileSync(filePath, 'utf8');
+  const match = envFile.match(new RegExp(`^${key}=(.*)$`, 'm'));
+  return match?.[1]?.trim().replace(/^['"]|['"]$/g, '');
+}
 
 dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  readEnvValue(path.join(__dirname, '..', '.env.local'), 'DATABASE_URL') ||
+  readEnvValue(path.join(__dirname, '..', '.env'), 'DATABASE_URL');
 
 if (!DATABASE_URL) {
   console.error('Set DATABASE_URL environment variable (e.g. postgres://user:pass@host:port/db)');
@@ -20,7 +37,7 @@ async function run() {
 
   try {
     const files = fs.readdirSync(MIGRATIONS_DIR)
-      .filter(f => f.endsWith('.sql'))
+      .filter((file) => file.endsWith('.sql'))
       .sort();
 
     for (const file of files) {

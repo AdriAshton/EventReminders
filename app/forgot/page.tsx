@@ -28,22 +28,22 @@ export default function ForgotPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4">Forgot password</Typography>
-      <Typography variant="body2" sx={{ mt: 1 }}>Enter your account email to receive reset instructions.</Typography>
+      <Typography variant="h4" sx={{ color: "#000" }}>Forgot password</Typography>
+      <Typography variant="body2" sx={{ mt: 1, color: "#000" }}>Enter your account email to receive reset instructions.</Typography>
       <TextField
         label="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         sx={{
           mt: 2,
-          '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.85)' },
-          '& .MuiInputBase-input': { color: 'rgba(255,255,255,0.95)' },
-          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 1 },
+          '& .MuiInputLabel-root': { color: '#000' },
+          '& .MuiInputBase-input': { color: '#000' },
+          '& .MuiInputBase-root': { backgroundColor: 'rgba(255,255,255,0.65)', borderRadius: 1 },
         }}
         fullWidth
       />
       <Button variant="contained" sx={{ mt: 2 }} onClick={submit}>Send reset</Button>
-      {msg && <Typography sx={{ mt: 2 }}>{msg}</Typography>}
+      {msg && <Typography sx={{ mt: 2, color: '#000' }}>{msg}</Typography>}
     </Box>
   );
 }

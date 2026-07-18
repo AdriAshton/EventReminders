@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import pool from '@/lib/db';
 import { getCompanySettings } from '@/lib/appSettings';
+import { getServerEnv } from '@/lib/serverEnv';
 
 class AuthError extends Error {
   status = 401;
@@ -14,7 +15,8 @@ function verifyToken(req: Request) {
     throw new AuthError("Unauthorized");
   }
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function getCompanyId(decoded: any) {
@@ -84,14 +86,29 @@ export async function GET(req: Request) {
     }
 
     if (url.searchParams.get("distinct") === "1") {
+      const firstname = url.searchParams.get("firstname") || "";
+      const lastname = url.searchParams.get("lastname") || "";
+      const optionWhereClauses: string[] = ['companyid = $1'];
+      const optionValues: Array<string | number> = [companyId];
+
+      if (firstname) {
+        optionValues.push(firstname);
+        optionWhereClauses.push(`firstname = $${optionValues.length}`);
+      }
+
+      if (lastname) {
+        optionValues.push(lastname);
+        optionWhereClauses.push(`lastname = $${optionValues.length}`);
+      }
+
       const valuesResult = await pool.query(
         `SELECT
            COALESCE(array_agg(DISTINCT firstname ORDER BY firstname) FILTER (WHERE firstname IS NOT NULL AND firstname <> ''), '{}') AS firstnames,
            COALESCE(array_agg(DISTINCT lastname ORDER BY lastname) FILTER (WHERE lastname IS NOT NULL AND lastname <> ''), '{}') AS lastnames,
            COALESCE(array_agg(DISTINCT to_char(birthdate, 'MM/DD/YYYY') ORDER BY to_char(birthdate, 'MM/DD/YYYY')) FILTER (WHERE birthdate IS NOT NULL), '{}') AS birthdates
          FROM clients
-         WHERE companyid = $1`,
-        [companyId]
+         WHERE ${optionWhereClauses.join(" AND ")}`,
+        optionValues
       );
 
       return NextResponse.json(valuesResult.rows[0] ?? { firstnames: [], lastnames: [], birthdates: [] });
@@ -203,18 +220,14 @@ export async function POST(req: Request) {
       if (reminderId) {
         await pool.query(
           `INSERT INTO messages (
-            reminderid, companyid, channel, subject, messagebody,
-            attachmenturl, attachmentfilename, attachmentmimetype, status, sentat
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            reminderid, companyid, channel, subject, messagebody, status, sentat
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)` ,
           [
             reminderId,
             normalizedCompanyId,
             'Email',
             null,
             '',
-            null,
-            null,
-            null,
             'Draft',
             null,
           ]

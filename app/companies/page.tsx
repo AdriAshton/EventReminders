@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -50,6 +51,7 @@ export default function CompaniesPage() {
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
   );
@@ -66,7 +68,7 @@ export default function CompaniesPage() {
     const token = getStoredToken();
     if (!token || isTokenExpired(token)) {
       setError("Session expired. Please log in again.");
-      router.replace("/login");
+      window.setTimeout(() => router.push("/login"), 0);
       return;
     }
 
@@ -80,14 +82,14 @@ export default function CompaniesPage() {
       setCanManageCompanies(manageAllowed);
       if (!viewAllowed) {
         setError("Administrator or Owner access is required.");
-        router.replace("/dashboard");
+        window.setTimeout(() => router.push("/dashboard"), 0);
         return;
       }
     } catch {
       setCanViewCompanies(false);
       setCanManageCompanies(false);
       setError("Administrator or Owner access is required.");
-      router.replace("/dashboard");
+      window.setTimeout(() => router.push("/dashboard"), 0);
       return;
     }
 
@@ -95,6 +97,7 @@ export default function CompaniesPage() {
   }, [mounted, router]);
 
   async function loadCompanies() {
+    setLoading(true);
     const data = await getCompanies();
 
     if (data.error) {
@@ -103,6 +106,8 @@ export default function CompaniesPage() {
       setCompanies(data);
       setError(null);
     }
+
+    setLoading(false);
   }
 
   const filteredCompanies = companies.filter((company) => {
@@ -282,6 +287,14 @@ export default function CompaniesPage() {
   
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
+        {loading && (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ ml: 2 }} color="text.secondary">
+              Loading companies...
+            </Typography>
+          </Box>
+        )}
         <Table>
           <TableHead>
             <TableRow>
@@ -293,7 +306,14 @@ export default function CompaniesPage() {
           </TableHead>
 
           <TableBody>
-            {filteredCompanies.map((company) => (
+            {!loading && filteredCompanies.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                  No companies to display.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCompanies.map((company) => (
               <TableRow
                 key={company.companyid}
                 hover
@@ -353,7 +373,8 @@ export default function CompaniesPage() {
                   </Button>}
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

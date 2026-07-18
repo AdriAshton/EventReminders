@@ -4,6 +4,7 @@ export type UserRecord = {
   userid: number;
   username: string;
   email: string;
+  companyname?: string;
   roleid?: number;
   role?: string;
   rolename?: string;

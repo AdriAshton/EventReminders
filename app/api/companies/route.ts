@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { getServerEnv } from '@/lib/serverEnv';
 
 // Helper: verify token
 function verifyToken(req: Request) {
@@ -9,7 +10,8 @@ function verifyToken(req: Request) {
     throw new Error("Unauthorized");
   }
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 function getCompanyId(decoded: any) {
@@ -22,12 +24,31 @@ function isPrivilegedRole(decoded: any) {
   return role === "administrator" || role === "owner";
 }
 
+function isOwner(decoded: any) {
+  return String(decoded?.role || "").toLowerCase() === "owner";
+}
+
 // ✅ GET companies (scoped by user’s companyid if needed)
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
     if (!isPrivilegedRole(decoded)) {
       return NextResponse.json({ error: "Administrator or Owner access is required" }, { status: 403 });
+    }
+
+    const url = new URL(req.url);
+    if (url.searchParams.get("current") === "1") {
+      const companyId = getCompanyId(decoded);
+      if (!companyId) {
+        return NextResponse.json({ error: "Company access is required" }, { status: 403 });
+      }
+
+      const result = await pool.query(
+        "SELECT companyid, companyname FROM companies WHERE companyid = $1",
+        [companyId]
+      );
+
+      return NextResponse.json(result.rows[0] ?? null);
     }
 
     const result = await pool.query("SELECT * FROM companies ORDER BY companyid DESC");

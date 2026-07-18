@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -31,6 +32,7 @@ import {
   type UserRecord,
   type UserListResponse,
 } from "@/services/userService";
+import { getStoredToken } from "@/lib/authClient";
 
 const ROLE_OPTIONS = [
   { roleid: 1, rolename: "Administrator" },
@@ -54,6 +56,9 @@ export default function UsersPage() {
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isAdministrator, setIsAdministrator] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>(
     { open: false, message: "", severity: "success" }
   );
@@ -72,6 +77,8 @@ export default function UsersPage() {
   const filteredUsers = users.filter((user) => (usernameFilter === "" ? true : String(user.username || "") === usernameFilter))
     .filter((user) => (emailFilter === "" ? true : String(user.email || "") === emailFilter));
 
+  const displayedUsers = filteredUsers;
+
   const cascadedUsernameOptions = [...new Set(
     users
       .filter((user) => (emailFilter === "" ? true : String(user.email || "") === emailFilter))
@@ -87,13 +94,48 @@ export default function UsersPage() {
   )].sort((left, right) => left.localeCompare(right));
 
   async function loadUsers() {
-    const data = (await getUsers()) as UserListResponse;
+    setLoading(true);
+    try {
+      const token = getStoredToken();
+      if (!token) {
+        setUsers([]);
+        setError("Your session is missing. Please sign in again.");
+        setLoadFailed(true);
+        return;
+      }
 
-    if (data.error) {
-      setError(data.error);
-    } else {
-      setUsers((data.users || []).map(normalizeUser));
+      const payloadPart = token.split(".")[1];
+      if (payloadPart) {
+        const normalizedPayload = payloadPart.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
+        const decodedPayload = JSON.parse(atob(normalizedPayload));
+        setIsAdministrator(String(decodedPayload?.role || "").toLowerCase() === "administrator");
+      }
+
+      const response = await fetch("/api/users", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = (await response.json()) as UserListResponse;
+
+      if (!response.ok) {
+        setUsers([]);
+        setError(data.error || "Failed to fetch users");
+        setLoadFailed(true);
+        return;
+      }
+
+      setUsers((Array.isArray(data) ? data : data.users || []).map(normalizeUser));
       setError(null);
+      setLoadFailed(false);
+    } catch (loadError: any) {
+      setUsers([]);
+      setError(loadError?.message || "Failed to fetch users");
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -225,9 +267,11 @@ export default function UsersPage() {
             Back
           </Button>
 
-          <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
-            Add Users
-          </Button>
+          {!isAdministrator && (
+            <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
+              Add Users
+            </Button>
+          )}
 
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel id="users-username-filter">Username</InputLabel>
@@ -274,10 +318,19 @@ export default function UsersPage() {
       )}
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
+        {loading && (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+            <Typography sx={{ ml: 2 }} color="text.secondary">
+              Loading users...
+            </Typography>
+          </Box>
+        )}
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>Username</TableCell>
+              <TableCell>Company</TableCell>
               <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -285,55 +338,70 @@ export default function UsersPage() {
           </TableHead>
 
           <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow
-                key={user.userid}
-                hover
-                selected={editingUser?.userid === user.userid}
-                onDoubleClick={() => {
-                  setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
-                  setIsChangingPassword(false);
-                  setDialogError(null);
-                }}
-                sx={{
-                  cursor: "pointer",
-                  "&.Mui-selected": {
-                    backgroundColor: "#1e88e5",
-                    color: "#fff",
-                  },
-                }}
-              >
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role || user.rolename}</TableCell>
-
-                <TableCell align="right">
-                  <Button
-                    color="error"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!window.confirm("Are you sure you want to delete this user?")) {
-                        return;
-                      }
-                      handleDelete(user.userid);
-                    }}
-                  >
-                    Delete
-                  </Button>
-
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
-                      setIsChangingPassword(false);
-                      setDialogError(null);
-                    }}
-                  >
-                    View/Edit
-                  </Button>
+            {!loading && displayedUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                  {loadFailed
+                    ? "Unable to load users for the current session. Please sign in again or refresh the page."
+                    : users.length === 0
+                      ? "No users have been added yet."
+                      : "No users match the current filters."}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              displayedUsers.map((user) => (
+                <TableRow
+                  key={user.userid}
+                  hover
+                  selected={editingUser?.userid === user.userid}
+                  onDoubleClick={() => {
+                    setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
+                    setIsChangingPassword(false);
+                    setDialogError(null);
+                  }}
+                  sx={{
+                    cursor: "pointer",
+                    "&.Mui-selected": {
+                      backgroundColor: "#1e88e5",
+                      color: "#fff",
+                    },
+                  }}
+                >
+                  <TableCell>{user.username}</TableCell>
+                  <TableCell>{user.companyname || "-"}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.role || user.rolename}</TableCell>
+
+                  <TableCell align="right">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingUser({ ...normalizeUser(user), password: "", confirmPassword: "" });
+                        setIsChangingPassword(false);
+                        setDialogError(null);
+                      }}
+                    >
+                      View/Edit
+                    </Button>
+
+                    {!isAdministrator && (
+                      <Button
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!window.confirm("Are you sure you want to delete this user?")) {
+                            return;
+                          }
+                          handleDelete(user.userid);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

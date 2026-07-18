@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { getServerEnv } from '@/lib/serverEnv';
 
 function getErrorStatus(err: unknown) {
   return err instanceof Error && err.message === "Unauthorized" ? 401 : 500;
@@ -12,7 +13,8 @@ function verifyToken(req: Request) {
     throw new Error("Unauthorized");
   }
   const token = authHeader.split(" ")[1];
-  return jwt.verify(token, process.env.JWT_SECRET!) as any;
+  const jwtSecret = getServerEnv('JWT_SECRET') || 'yourSuperSecretKey123';
+  return jwt.verify(token, jwtSecret) as any;
 }
 
 export async function GET(req: Request) {

@@ -1,5 +1,7 @@
 const TOKEN_KEY = "token";
 const AUTH_COOKIE_KEY = "auth";
+const SESSION_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const SESSION_ACTIVITY_KEY = "authLastActivityAt";
 
 function decodeBase64Url(value: string) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -23,6 +25,32 @@ export function getStoredToken() {
     ?.split("=")[1];
 
   return cookieToken ? decodeURIComponent(cookieToken) : null;
+}
+
+function getLastActivityAt() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const rawValue = localStorage.getItem(SESSION_ACTIVITY_KEY);
+  const parsedValue = rawValue ? Number(rawValue) : NaN;
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function setLastActivityAt(timestamp: number = Date.now()) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(SESSION_ACTIVITY_KEY, String(timestamp));
+}
+
+function clearLastActivityAt() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(SESSION_ACTIVITY_KEY);
 }
 
 export function getTokenPayload(token?: string | null) {
@@ -52,6 +80,15 @@ export function isTokenExpired(token?: string | null) {
   return payload.exp * 1000 <= Date.now();
 }
 
+export function isSessionIdleExpired() {
+  const lastActivityAt = getLastActivityAt();
+  if (!lastActivityAt) {
+    return true;
+  }
+
+  return Date.now() - lastActivityAt >= SESSION_IDLE_LIMIT_MS;
+}
+
 function setAuthCookie(token: string) {
   const payload = getTokenPayload(token);
   const expires =
@@ -73,6 +110,7 @@ export function setStoredToken(token: string) {
 
   localStorage.setItem(TOKEN_KEY, token);
   setAuthCookie(token);
+  setLastActivityAt();
 }
 
 export function clearStoredToken() {
@@ -82,6 +120,7 @@ export function clearStoredToken() {
 
   localStorage.removeItem(TOKEN_KEY);
   clearAuthCookie();
+  clearLastActivityAt();
 }
 
 export function redirectToLogin(reason = "expired") {
@@ -98,12 +137,13 @@ export function redirectToLogin(reason = "expired") {
 
 export function ensureValidSession() {
   const token = getStoredToken();
-  if (!token || isTokenExpired(token)) {
+  if (!token || isTokenExpired(token) || isSessionIdleExpired()) {
     redirectToLogin(token ? "expired" : "missing");
     return null;
   }
 
   setAuthCookie(token);
+  setLastActivityAt();
   return token;
 }
 
@@ -126,6 +166,8 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
     ...init,
     headers,
   });
+
+  setLastActivityAt();
 
   if (response.status === 401) {
     redirectToLogin("expired");

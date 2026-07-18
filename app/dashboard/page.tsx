@@ -64,9 +64,13 @@ export default function Dashboard() {
     async function load() {
       try {
         const clients = await getClients(1, 1000);
-        const clientsRows = clients.rows || clients;
-        setClientsRows(clientsRows || []);
-        setTotalClients(clients.total || (clientsRows ? clientsRows.length : 0));
+        const clientsRows = Array.isArray(clients?.rows)
+          ? clients.rows
+          : Array.isArray(clients)
+            ? clients
+            : [];
+        setClientsRows(clientsRows);
+        setTotalClients(typeof clients?.total === 'number' ? clients.total : clientsRows.length);
 
         const clientsMap: Record<number, string> = {};
         (clientsRows || []).forEach((c: any) => {
@@ -96,7 +100,7 @@ export default function Dashboard() {
         setUpcomingBirthdays(upcoming.slice(0, 5));
 
         const messages = await getMessages(1, 1000);
-        const messageRows = messages.rows || [];
+        const messageRows = Array.isArray(messages?.rows) ? messages.rows : [];
         const now = new Date();
         const sevenDaysAgo = new Date(now);
         sevenDaysAgo.setDate(now.getDate() - 7);
@@ -115,7 +119,8 @@ export default function Dashboard() {
         );
 
         const reminders = await getReminders(1, 5);
-        setActiveReminders(reminders.total || (reminders.rows ? reminders.rows.length : 0));
+        const reminderRows = Array.isArray(reminders?.rows) ? reminders.rows : [];
+        setActiveReminders(typeof reminders?.total === 'number' ? reminders.total : reminderRows.length);
 
       } catch (err) {
         console.error(err);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { getServerEnv } from "@/lib/serverEnv";
 
 export async function POST(req: Request) {
   try {
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
       [invite.inviteid]
     );
 
-    const jwtSecret = process.env.JWT_SECRET;
+    const jwtSecret = getServerEnv("JWT_SECRET") || "yourSuperSecretKey123";
     if (!jwtSecret) {
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }

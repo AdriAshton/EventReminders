@@ -358,9 +358,24 @@ export default function TemplatesPage() {
               </Box>
 
               <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-                <Chip label="{{clientName}}" size="small" onDoubleClick={() => insertTemplateToken("{{clientName}}")} />
-                <Chip label="{{companyName}}" size="small" onDoubleClick={() => insertTemplateToken("{{companyName}}")} />
-                <Chip label="{{eventDate}}" size="small" onDoubleClick={() => insertTemplateToken("{{eventDate}}")} />
+                <Chip
+                  label="{{clientName}}"
+                  size="small"
+                  onDoubleClick={() => insertTemplateToken("{{clientName}}")} 
+                  sx={{ cursor: "pointer" }}
+                />
+                <Chip
+                  label="{{companyName}}"
+                  size="small"
+                  onDoubleClick={() => insertTemplateToken("{{companyName}}")} 
+                  sx={{ cursor: "pointer" }}
+                />
+                <Chip
+                  label="{{eventDate}}"
+                  size="small"
+                  onDoubleClick={() => insertTemplateToken("{{eventDate}}")} 
+                  sx={{ cursor: "pointer" }}
+                />
               </Stack>
 
               <Stack direction="row" spacing={2}>

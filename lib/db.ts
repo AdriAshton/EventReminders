@@ -1,14 +1,16 @@
 import { Pool } from 'pg';
+import { getServerEnv } from '@/lib/serverEnv';
 
 let pool: Pool | null = null;
 
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL must be configured as an environment variable');
-    }
+    const connectionString = getServerEnv('DATABASE_URL') || 'postgresql://postgres:password@localhost:5432/birthday_reminder';
 
+    if (!connectionString) {
+      throw new Error('DATABASE_URL must be configured');
+    }
+    
     pool = new Pool({
       connectionString,
     });
