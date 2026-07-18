@@ -108,4 +108,4 @@ Use this file to track manual testing as you go through each screen in the app.
 - [x] Confirm no unexpected redirects happen after login
 - [x] Confirm empty tables show a visible message
 - [x] Confirm loading indicators appear on all table screens
-- [x] Confirm browser console has no major errors
+- [ ] Confirm browser console has no major errors

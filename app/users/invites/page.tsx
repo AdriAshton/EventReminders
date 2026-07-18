@@ -100,9 +100,13 @@ export default function InvitePage() {
       : null;
 
     if (resolvedCompany) {
-      setCompanies([resolvedCompany]);
-      setCompanyid(String(resolvedCompany.companyid));
-      setCompanyLabel(resolvedCompany.companyname || fallbackCompanyName || "");
+      const normalizedCompany = {
+        companyid: Number(resolvedCompany.companyid),
+        companyname: String(resolvedCompany.companyname || fallbackCompanyName || ""),
+      };
+      setCompanies([normalizedCompany]);
+      setCompanyid(String(normalizedCompany.companyid));
+      setCompanyLabel(normalizedCompany.companyname);
       return;
     }
 

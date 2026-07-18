@@ -114,11 +114,11 @@ function SignupContent() {
           )}
           <TextField
             label="Email"
-            value={isInviteFlow ? inviteEmail || email : email}
+            value={isInviteFlow ? inviteEmail : email}
             onChange={(e) => setEmail(e.target.value)}
             fullWidth
             margin="normal"
-            slotProps={isInviteFlow ? { input: { readOnly: true } } : undefined}
+            slotProps={isInviteFlow ? { htmlInput: { readOnly: true } } : undefined}
           />
           <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
           {!isInviteFlow && (
