@@ -52,6 +52,15 @@ This file is a best-effort reconstruction of work completed in this project base
   - `services/testEndpoints.txt`
   - `services/userService.ts`
 
+## Latest Session Updates
+
+- Confirmed the Companies screen already renders an empty-state row with the message `No companies to display.` when the filtered list is empty.
+- Marked the Companies empty-state checklist item as complete in `STD_Test_Checklist.md`.
+- Connected to the local PostgreSQL database on `localhost:5432` using the `birthday_reminder` database.
+- Verified the local `roles` table contains `Administrator`, `Staff`, and `Owner`.
+- Updated the local `users` row for Adrian so it now points to the `Owner` role.
+- Added a repository SQL update in `migrations/002_roles_seed.sql` so Adrian is promoted to `Owner` when the seed file is applied.
+
 ## Latest Work Added
 
 - Fixed the recurring birthday reminder email path so it formats the event date before rendering the template and before building the fallback reminder text.
