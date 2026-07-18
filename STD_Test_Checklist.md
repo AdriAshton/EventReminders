@@ -44,18 +44,18 @@ Use this file to track manual testing as you go through each screen in the app.
 - [x] Confirm the table loads
 - [x] Confirm loading indicator shows while fetching
 - [x] Confirm empty state shows when no users exist
-- [ ] Confirm filters work
-- [ ] Confirm view/edit works
-- [ ] Confirm delete works
-- [ ] Confirm the Add Users button is removed
+- [x] Confirm filters work
+- [x] Confirm view/edit works
+- [x] Confirm delete works
+- [x] Confirm the Add Users button is removed
 
 ## Invites
-- [ ] Open the sent invites screen
-- [ ] Confirm the page loads without redirecting
-- [ ] Confirm loading indicator shows while fetching
-- [ ] Confirm empty state shows when no invites exist
-- [ ] Confirm invite sending works
-- [ ] Confirm invite status updates after sending
+- [x] Open the sent invites screen
+- [x] Confirm the page loads without redirecting
+- [x] Confirm loading indicator shows while fetching
+- [x] Confirm empty state shows when no invites exist
+- [x] Confirm invite sending works
+- [x] Confirm invite status updates after sending
 
 ## Messages
 - [x] Open the messages screen
@@ -69,15 +69,15 @@ Use this file to track manual testing as you go through each screen in the app.
 - [x] Confirm pagination works
 
 ## Reminders
-- [ ] Open the reminders screen
-- [ ] Confirm the table loads
-- [ ] Confirm loading indicator shows while fetching
-- [ ] Confirm empty state shows when no reminders exist
-- [ ] Confirm filters work
-- [ ] Confirm bulk select and delete work
-- [ ] Confirm message preview works
-- [ ] Confirm reminder image preview works
-- [ ] Confirm pagination works
+- [x] Open the reminders screen
+- [x] Confirm the table loads
+- [x] Confirm loading indicator shows while fetching
+- [x] Confirm empty state shows when no reminders exist
+- [x] Confirm filters work
+- [x] Confirm bulk select and delete work
+- [x] Confirm message preview works
+- [x] Confirm reminder image preview works
+- [x] Confirm pagination works
 
 ## Templates
 - [x] Open the templates screen
@@ -93,15 +93,15 @@ Use this file to track manual testing as you go through each screen in the app.
 - [x] Open the settings screen
 - [x] Confirm settings load correctly
 - [x] Confirm email settings screen loads
-- [ ] Confirm 2FA settings screen loads
-- [ ] Confirm saving settings works
+- [x] Confirm 2FA settings screen loads
+- [x] Confirm saving settings works
 
 ## Password and Auth Flows
-- [ ] Confirm forgot password page loads
-- [ ] Confirm reset password page loads
-- [ ] Confirm signup page loads
-- [ ] Confirm invite-based signup works
-- [ ] Confirm 2FA verify page works if enabled
+- [x] Confirm forgot password page loads
+- [x] Confirm reset password page loads
+- [x] Confirm signup page loads
+- [x] Confirm invite-based signup works
+- [x] Confirm 2FA verify page works if enabled
 
 ## General Checks
 - [x] Confirm protected pages redirect when logged out
