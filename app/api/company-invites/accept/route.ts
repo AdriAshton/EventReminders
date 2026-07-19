@@ -4,6 +4,35 @@ import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 import { getServerEnv } from "@/lib/serverEnv";
 
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const inviteToken = String(searchParams.get("inviteToken") || searchParams.get("invite") || "").trim();
+
+    if (!inviteToken) {
+      return NextResponse.json({ error: "inviteToken is required" }, { status: 400 });
+    }
+
+    const inviteResult = await pool.query(
+      `SELECT ci.inviteid, ci.companyid, c.companyname, ci.email, ci.roleid, ci.status, ci.expiresat
+       FROM company_invites
+       JOIN companies c ON c.companyid = company_invites.companyid
+       WHERE company_invites.token = $1
+       LIMIT 1`,
+      [inviteToken]
+    );
+
+    const invite = inviteResult.rows[0];
+    if (!invite) {
+      return NextResponse.json({ error: "Invalid invite token" }, { status: 404 });
+    }
+
+    return NextResponse.json({ invite });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Failed to load invite" }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -16,9 +45,10 @@ export async function POST(req: Request) {
     }
 
     const inviteResult = await pool.query(
-      `SELECT inviteid, companyid, email, roleid, status, expiresat
-       FROM company_invites
-       WHERE token = $1
+      `SELECT ci.inviteid, ci.companyid, c.companyname, ci.email, ci.roleid, ci.status, ci.expiresat
+       FROM company_invites ci
+       JOIN companies c ON c.companyid = ci.companyid
+       WHERE ci.token = $1
        LIMIT 1`,
       [inviteToken]
     );

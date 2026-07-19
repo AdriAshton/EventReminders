@@ -16,7 +16,7 @@ export default function Dashboard() {
   const [upcomingBirthdayCount, setUpcomingBirthdayCount] = useState<number>(0);
   const [emailsSentLast7Days, setEmailsSentLast7Days] = useState<number>(0);
   const [activeReminders, setActiveReminders] = useState<number>(0);
-  const [isAdministrator, setIsAdministrator] = useState<boolean>(false);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
 
   const [clientsRows, setClientsRows] = useState<any[]>([]);
@@ -53,10 +53,10 @@ export default function Dashboard() {
       const decoded = getTokenPayload(token);
       if (decoded) {
         const role = String(decoded.role || "").toLowerCase();
-        setIsAdministrator(role === "administrator" || role === "owner");
+        setIsOwner(role === "owner");
         setUsername(String(decoded.username || ""));
       } else {
-        setIsAdministrator(false);
+        setIsOwner(false);
         setUsername("");
       }
     }
@@ -270,33 +270,33 @@ export default function Dashboard() {
           </Card>
         </Box>
 
-        {isAdministrator && (
-          <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
-            <Card sx={{ height: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                  <Avatar sx={{ bgcolor: 'rgba(34,197,94,0.12)', color: '#166534' }}>⚙</Avatar>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>Setup/Security</Typography>
-                </Box>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Company settings and user management</Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+        <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
+          <Card sx={{ height: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <Avatar sx={{ bgcolor: 'rgba(34,197,94,0.12)', color: '#166534' }}>⚙</Avatar>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>Setup/Security</Typography>
+              </Box>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>Company settings and user management</Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                {isOwner && (
                   <Button variant="contained" onClick={() => router.push('/companies')}>
                     Companies
                   </Button>
-                  <Button variant="outlined" onClick={() => router.push('/users')}>
-                    Users
-                  </Button>
-                  <Button variant="outlined" onClick={() => router.push('/users/invites')}>
-                    Send Invite
-                  </Button>
-                  <Button variant="outlined" onClick={() => router.push('/settings/email')}>
-                    Email Provider
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-        )}
+                )}
+                <Button variant="outlined" onClick={() => router.push('/users')}>
+                  Users
+                </Button>
+                <Button variant="outlined" onClick={() => router.push('/users/invites')}>
+                  Send Invite
+                </Button>
+                <Button variant="outlined" onClick={() => router.push('/settings/email')}>
+                  Email Provider
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
 
       <Box sx={{ mt: 4, display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.15fr 0.85fr' }, gap: 3 }}>

@@ -16,6 +16,7 @@ function SignupContent() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const isInviteFlow = Boolean(invite);
 
@@ -23,20 +24,33 @@ function SignupContent() {
     if (isInviteFlow) {
       setMessage((current) => current || "Invite detected. Complete your account to join the company.");
       if (invite) {
+        setInviteLoading(true);
         void (async () => {
           try {
-            const res = await fetch(`/api/company-invites?invite=${encodeURIComponent(invite)}`);
+            const res = await fetch(`/api/company-invites/accept?inviteToken=${encodeURIComponent(invite)}`);
             const data = await res.json();
-            const inviteRecord = Array.isArray(data) ? data.find((entry) => String(entry?.token || "") === invite) : null;
+            const inviteRecord = data?.invite || data;
             if (inviteRecord?.email) {
               const resolvedEmail = String(inviteRecord.email).trim();
               setInviteEmail(resolvedEmail);
               setEmail(resolvedEmail);
+            } else {
+              setInviteEmail("");
+              setEmail("");
             }
           } catch {
             // Leave the field editable if the invite lookup fails.
+            setInviteEmail("");
+            setEmail("");
+          } finally {
+            setInviteLoading(false);
           }
         })();
+      }
+      if (!invite) {
+        setInviteEmail("");
+        setEmail("");
+        setInviteLoading(false);
       }
       return;
     }
@@ -98,14 +112,14 @@ function SignupContent() {
     <Box sx={{ display: "flex", justifyContent: "center", mt: 6, px: 2 }}>
       <Card sx={{ width: "100%", maxWidth: 520 }}>
         <CardContent>
-          <Typography variant="h5" gutterBottom>
+          <Typography variant="h5" gutterBottom sx={{ color: "#000" }}>
             Company Onboarding
           </Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2, color: "#000" }}>
             {message}
           </Typography>
           {error && (
-            <Typography color="error" variant="body2" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 2, color: "#000" }}>
               {error}
             </Typography>
           )}
@@ -114,11 +128,19 @@ function SignupContent() {
           )}
           <TextField
             label="Email"
-            value={isInviteFlow ? inviteEmail : email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={isInviteFlow ? (inviteLoading ? "Loading invite email..." : inviteEmail) : email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (isInviteFlow) {
+                setInviteEmail(e.target.value);
+              }
+            }}
             fullWidth
             margin="normal"
-            slotProps={isInviteFlow ? { htmlInput: { readOnly: true } } : undefined}
+            sx={{
+              '& .MuiInputLabel-root': { color: '#000' },
+              '& .MuiInputBase-input': { color: '#000' },
+            }}
           />
           <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth margin="normal" />
           {!isInviteFlow && (

@@ -20,7 +20,6 @@ import {
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
-import { getCompanies } from "@/services/CompanyService";
 import { getCompanyInvites, sendCompanyInvite, type CompanyInviteRecord, type CompanyInviteResponse } from "@/services/companyInviteService";
 
 const ROLE_OPTIONS = [
@@ -43,12 +42,7 @@ export default function InvitePage() {
   const [invites, setInvites] = useState<CompanyInviteRecord[]>([]);
   const [mounted, setMounted] = useState(false);
   const [companyId, setCompanyId] = useState<number | null>(null);
-  const [companies, setCompanies] = useState<Array<{ companyid: number; companyname: string }>>([]);
-  const [isOwner, setIsOwner] = useState(false);
   const [companyLabel, setCompanyLabel] = useState("");
-
-  const pendingCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "pending").length;
-  const acceptedCount = invites.filter((invite) => String(invite.status || "").toLowerCase() === "accepted").length;
 
   useEffect(() => {
     setMounted(true);
@@ -68,52 +62,17 @@ export default function InvitePage() {
     const payload = getTokenPayload(token);
     const resolvedCompanyId = Number(payload?.companyid);
     const resolvedRole = String(payload?.role || "").toLowerCase();
+    const resolvedCompanyName = String(payload?.companyname || "").trim();
     if (!Number.isFinite(resolvedCompanyId) || resolvedCompanyId <= 0) {
       setError("Unable to determine your company ID from the current session");
       return;
     }
 
     setCompanyId(resolvedCompanyId);
+    setCompanyLabel(resolvedCompanyName);
     setCompanyid(String(resolvedCompanyId));
-    setIsOwner(resolvedRole === "owner");
-    setCompanyLabel(String(payload?.companyname || ""));
-
-    void loadCompanies(resolvedRole === "owner", resolvedCompanyId, String(payload?.companyname || ""));
     void loadInvites();
   }, [mounted, router]);
-
-  async function loadCompanies(ownerMode: boolean, currentCompanyId: number, fallbackCompanyName: string) {
-    const data = await getCompanies(!ownerMode);
-    if (data.error) {
-      setError(data.error);
-      return;
-    }
-
-    if (ownerMode) {
-      setCompanies(Array.isArray(data) ? data : []);
-      return;
-    }
-
-    const currentCompany = data && typeof data === "object" ? data as { companyid?: number; companyname?: string } : null;
-    const resolvedCompany = currentCompany && Number(currentCompany.companyid) === Number(currentCompanyId)
-      ? currentCompany
-      : null;
-
-    if (resolvedCompany) {
-      const normalizedCompany = {
-        companyid: Number(resolvedCompany.companyid),
-        companyname: String(resolvedCompany.companyname || fallbackCompanyName || ""),
-      };
-      setCompanies([normalizedCompany]);
-      setCompanyid(String(normalizedCompany.companyid));
-      setCompanyLabel(normalizedCompany.companyname);
-      return;
-    }
-
-    setCompanies([]);
-    setCompanyid(String(currentCompanyId || ""));
-    setCompanyLabel(fallbackCompanyName || "");
-  }
 
   async function loadInvites() {
     const data = (await getCompanyInvites()) as CompanyInviteResponse;
@@ -164,7 +123,7 @@ export default function InvitePage() {
         </Button>
       </Box>
 
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 0.6fr" }, mb: 3 }}>
+      <Box sx={{ mb: 3 }}>
         <Card>
           <CardContent>
             <Typography variant="h6" sx={{ mb: 2 }}>New Invite</Typography>
@@ -176,35 +135,40 @@ export default function InvitePage() {
                 onChange={(e) => setEmail(e.target.value)}
                 fullWidth
               />
-              <FormControl fullWidth>
+              <FormControl fullWidth variant="outlined">
                 <InputLabel id="company-select-label">Company</InputLabel>
                 <Select
                   labelId="company-select-label"
                   label="Company"
+                  notched
+                  sx={{
+                    "& .MuiSelect-select": {
+                      py: 1.7,
+                      minHeight: "1.4375em",
+                      display: "flex",
+                      alignItems: "center",
+                    },
+                  }}
                   value={companyid}
                   displayEmpty
-                  onChange={(e) => setCompanyid(String(e.target.value))}
+                  onChange={(e) => {
+                    const nextCompanyId = String(e.target.value);
+                    setCompanyid(nextCompanyId);
+                  }}
                   renderValue={(selected) => {
                     if (!selected) {
-                      return <span style={{ color: "rgba(0, 0, 0, 0.6)" }}>Select a company</span>;
+                      return <span style={{ color: "rgba(0, 0, 0, 0.6)", display: "block", lineHeight: 1.5 }}>Select a company</span>;
                     }
 
-                    if (companyLabel) return companyLabel;
+                    if (companyLabel) return <span style={{ display: "block", lineHeight: 1.5 }}>{companyLabel}</span>;
 
-                    const selectedCompany = companies.find((company) => String(company.companyid) === String(selected));
-                    if (selectedCompany?.companyname) return selectedCompany.companyname;
-
-                    return <span style={{ color: "rgba(0, 0, 0, 0.6)" }}>Select a company</span>;
+                    return <span style={{ color: "rgba(0, 0, 0, 0.6)", display: "block", lineHeight: 1.5 }}>Select a company</span>;
                   }}
                 >
                   <MenuItem value="">
                     Select a company
                   </MenuItem>
-                  {companies.map((company) => (
-                    <MenuItem key={company.companyid} value={String(company.companyid)}>
-                      {company.companyname}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value={String(companyId || "")}>{companyLabel || "Current company"}</MenuItem>
                 </Select>
               </FormControl>
               <TextField
@@ -221,7 +185,6 @@ export default function InvitePage() {
                 ))}
               </TextField>
             </Box>
-
             {error && (
               <Typography color="error" sx={{ mt: 2 }}>
                 {error}
@@ -233,26 +196,6 @@ export default function InvitePage() {
                 Send Invite
               </Button>
             </Box>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            <Typography variant="h6" sx={{ mb: 2 }}>Overview</Typography>
-            <Stack spacing={1.5}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="body2" color="text.secondary">Total Invites</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>{invites.length}</Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="body2" color="text.secondary">Pending</Typography>
-                <Chip size="small" label={pendingCount} color="warning" variant="outlined" />
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <Typography variant="body2" color="text.secondary">Accepted</Typography>
-                <Chip size="small" label={acceptedCount} color="success" variant="outlined" />
-              </Box>
-            </Stack>
           </CardContent>
         </Card>
       </Box>

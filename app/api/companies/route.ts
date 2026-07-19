@@ -21,11 +21,7 @@ function getCompanyId(decoded: any) {
 
 function isPrivilegedRole(decoded: any) {
   const role = String(decoded?.role || "").toLowerCase();
-  return role === "administrator" || role === "owner";
-}
-
-function isOwner(decoded: any) {
-  return String(decoded?.role || "").toLowerCase() === "owner";
+  return role === "owner";
 }
 
 // ✅ GET companies (scoped by user’s companyid if needed)
@@ -33,7 +29,7 @@ export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
     if (!isPrivilegedRole(decoded)) {
-      return NextResponse.json({ error: "Administrator or Owner access is required" }, { status: 403 });
+      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
     }
 
     const url = new URL(req.url);
@@ -64,7 +60,7 @@ export async function POST(req: Request) {
   try {
     const decoded = verifyToken(req);
     if (!isPrivilegedRole(decoded)) {
-      return NextResponse.json({ error: "Administrator or Owner access is required" }, { status: 403 });
+      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
     }
 
     const { companyname, contactemail, contactphone } = await req.json();
@@ -111,7 +107,7 @@ export async function PUT(req: Request) {
   try {
     const decoded = verifyToken(req);
     if (!isPrivilegedRole(decoded)) {
-      return NextResponse.json({ error: "Administrator or Owner access is required" }, { status: 403 });
+      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
     }
     const { companyid, companyname, contactemail, contactphone } = await req.json();
     const normalizedCompanyName = typeof companyname === "string" ? companyname.trim() : "";
@@ -165,7 +161,7 @@ export async function DELETE(req: Request) {
   try {
     const decoded = verifyToken(req);
     if (!isPrivilegedRole(decoded)) {
-      return NextResponse.json({ error: "Administrator or Owner access is required" }, { status: 403 });
+      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
     const normalizedCompanyId = Number(body?.companyid);

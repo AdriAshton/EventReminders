@@ -75,20 +75,20 @@ export default function CompaniesPage() {
     try {
       const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(token.split('.')[1].length / 4) * 4, '=')));
       const role = String(payload?.role || "").toLowerCase();
-      const viewAllowed = role === "administrator" || role === "owner";
+      const viewAllowed = role === "owner";
       const manageAllowed = role === "owner";
       setIsOwner(role === "owner");
       setCanViewCompanies(viewAllowed);
       setCanManageCompanies(manageAllowed);
       if (!viewAllowed) {
-        setError("Administrator or Owner access is required.");
+        setError("Owner access is required.");
         window.setTimeout(() => router.push("/dashboard"), 0);
         return;
       }
     } catch {
       setCanViewCompanies(false);
       setCanManageCompanies(false);
-      setError("Administrator or Owner access is required.");
+      setError("Owner access is required.");
       window.setTimeout(() => router.push("/dashboard"), 0);
       return;
     }
@@ -103,7 +103,8 @@ export default function CompaniesPage() {
     if (data.error) {
       setError(data.error);
     } else {
-      setCompanies(data);
+      const normalizedCompanies = Array.isArray(data) ? data : data ? [data] : [];
+      setCompanies(normalizedCompanies);
       setError(null);
     }
 
