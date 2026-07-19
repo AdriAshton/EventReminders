@@ -8,9 +8,17 @@
 
 # Work Done Log
 
-Last updated: 2026-07-14
+Last updated: 2026-07-19
 
 This file is a best-effort reconstruction of work completed in this project based on the current workspace state, package metadata, terminal context visible to Copilot, and uncommitted file changes. It separates verified facts from inferred history.
+
+## Latest Update (2026-07-19)
+
+- Completed the company invite onboarding flow updates for signup and invite acceptance.
+- Added username validation to the signup and invite-accept endpoints so duplicate usernames are rejected before account creation.
+- Updated the invite creation API to scope invite history to the signed-in company and return richer invite metadata, including role and invited-by details.
+- Reworked the invite management screen into a table-based history view with clearer company/role/status information and authenticated request handling.
+- Verified the current application state with a production build using `npm run build`.
 
 ## Verified Current Project State
 

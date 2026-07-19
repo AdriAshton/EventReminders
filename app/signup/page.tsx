@@ -11,6 +11,7 @@ function SignupContent() {
   const [email, setEmail] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [inviteUsername, setInviteUsername] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [message, setMessage] = useState("");
@@ -66,7 +67,12 @@ function SignupContent() {
       return;
     }
 
-    if (!isInviteFlow && !username.trim()) {
+    if (isInviteFlow) {
+      if (!inviteUsername.trim()) {
+        setError("Username is required");
+        return;
+      }
+    } else if (!username.trim()) {
       setError("Username is required when creating a new company");
       return;
     }
@@ -80,6 +86,7 @@ function SignupContent() {
           body: JSON.stringify({
             inviteToken: invite,
             email: email.trim(),
+            username: inviteUsername.trim(),
             password,
           }),
         });
@@ -122,6 +129,9 @@ function SignupContent() {
             <Typography variant="body2" sx={{ mb: 2, color: "#000" }}>
               {error}
             </Typography>
+          )}
+          {isInviteFlow && (
+            <TextField label="Username" value={inviteUsername} onChange={(e) => setInviteUsername(e.target.value)} fullWidth margin="normal" />
           )}
           {!isInviteFlow && (
             <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth margin="normal" />

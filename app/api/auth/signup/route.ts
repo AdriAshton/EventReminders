@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
+import pool from "@/lib/db";
 
 export async function POST(req: Request) {
   const { username, email, password } = await req.json();
@@ -13,10 +14,17 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { default: pool } = await import("@/lib/db");
-
     // ✅ Hash the password before saving
     const hash = await bcrypt.hash(password, 10);
+
+    const existingUsernameResult = await pool.query(
+      `SELECT userid FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+      [username.trim()]
+    );
+
+    if (existingUsernameResult.rows[0]) {
+      return NextResponse.json({ error: "Username already exists" }, { status: 400 });
+    }
 
     // ✅ Insert into users table
     const defaultRoleResult = await pool.query(

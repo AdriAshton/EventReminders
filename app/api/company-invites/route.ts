@@ -22,25 +22,35 @@ function verifyToken(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    verifyToken(req);
+    const decoded = verifyToken(req);
+    const companyId = Number(decoded?.companyid);
+    if (!Number.isFinite(companyId) || companyId <= 0) {
+      return NextResponse.json({ error: "companyid is missing from the JWT token" }, { status: 400 });
+    }
     const result = await pool.query(
       `SELECT ci.inviteid,
             ci.companyid,
             c.companyname,
             ci.email,
             ci.roleid,
+            r.rolename,
             ci.token,
             ci.status,
             ci.invitedby,
+            u.username AS invitedbyname,
             ci.invitedat,
             ci.acceptedat,
             ci.expiresat,
             ci.metadata
        FROM company_invites ci
        LEFT JOIN companies c ON c.companyid = ci.companyid
-       ORDER BY inviteid DESC`
+       LEFT JOIN roles r ON r.roleid = ci.roleid
+       LEFT JOIN users u ON u.userid = ci.invitedby
+      WHERE ci.companyid = $1
+      ORDER BY inviteid DESC`,
+      [companyId]
     );
-    return NextResponse.json(result.rows);
+    return NextResponse.json({ invites: result.rows });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to fetch invites";
     const status = message.toLowerCase().includes('does not exist') ? 500 : 401;

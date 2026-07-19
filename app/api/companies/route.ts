@@ -24,13 +24,9 @@ function isPrivilegedRole(decoded: any) {
   return role === "owner";
 }
 
-// ✅ GET companies (scoped by user’s companyid if needed)
 export async function GET(req: Request) {
   try {
     const decoded = verifyToken(req);
-    if (!isPrivilegedRole(decoded)) {
-      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
-    }
 
     const url = new URL(req.url);
     if (url.searchParams.get("current") === "1") {
@@ -45,6 +41,10 @@ export async function GET(req: Request) {
       );
 
       return NextResponse.json(result.rows[0] ?? null);
+    }
+
+    if (!isPrivilegedRole(decoded)) {
+      return NextResponse.json({ error: "Owner access is required" }, { status: 403 });
     }
 
     const result = await pool.query("SELECT * FROM companies ORDER BY companyid DESC");

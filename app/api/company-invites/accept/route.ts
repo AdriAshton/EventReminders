@@ -39,9 +39,10 @@ export async function POST(req: Request) {
     const inviteToken = String(body.inviteToken || "").trim();
     const email = String(body.email || "").trim();
     const password = String(body.password || "");
+    const desiredUsername = String(body.username || "").trim();
 
-    if (!inviteToken || !email || !password) {
-      return NextResponse.json({ error: "inviteToken, email, and password are required" }, { status: 400 });
+    if (!inviteToken || !email || !password || !desiredUsername) {
+      return NextResponse.json({ error: "inviteToken, email, username, and password are required" }, { status: 400 });
     }
 
     const inviteResult = await pool.query(
@@ -79,14 +80,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "An account with this email already exists" }, { status: 400 });
     }
 
+    const usernameResult = await pool.query(
+      `SELECT userid FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+      [desiredUsername]
+    );
+
+    if (usernameResult.rows[0]) {
+      return NextResponse.json({ error: "Username already exists" }, { status: 400 });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
-    const username = email.split("@")[0] || email;
 
     const userResult = await pool.query(
       `INSERT INTO users (username, email, passwordhash, roleid, companyid, inviteid)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING userid, username, email, companyid, roleid`,
-      [username, email, passwordHash, invite.roleid, invite.companyid, invite.inviteid]
+      [desiredUsername, email, passwordHash, invite.roleid, invite.companyid, invite.inviteid]
     );
 
     await pool.query(

@@ -8,19 +8,24 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   FormControl,
   InputLabel,
   MenuItem,
   Select,
   Snackbar,
-  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
+import { authenticatedFetch, getStoredToken, isTokenExpired, getTokenPayload } from "@/lib/authClient";
 import { getCompanyInvites, sendCompanyInvite, type CompanyInviteRecord, type CompanyInviteResponse } from "@/services/companyInviteService";
+import { getCompanies } from "@/services/CompanyService";
 
 const ROLE_OPTIONS = [
   { roleid: 1, rolename: "Administrator" },
@@ -32,6 +37,29 @@ function resolveRoleName(roleid: unknown) {
   return ROLE_OPTIONS.find((role) => role.roleid === numericRoleId)?.rolename || `Role ${String(roleid || "")}`;
 }
 
+function formatInviteDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function resolveInvitedBy(invite: CompanyInviteRecord) {
+  return invite.invitedbyname || "-";
+}
+
 export default function InvitePage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -41,8 +69,10 @@ export default function InvitePage() {
   const [error, setError] = useState("");
   const [invites, setInvites] = useState<CompanyInviteRecord[]>([]);
   const [mounted, setMounted] = useState(false);
-  const [companyId, setCompanyId] = useState<number | null>(null);
-  const [companyLabel, setCompanyLabel] = useState("");
+  const [companyOptions, setCompanyOptions] = useState<Array<{ companyid: number; companyname: string }>>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [resolvedCompanyId, setResolvedCompanyId] = useState<number | null>(null);
+  const [fetchState, setFetchState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
 
   useEffect(() => {
     setMounted(true);
@@ -55,32 +85,87 @@ export default function InvitePage() {
 
     const token = getStoredToken();
     if (!token || isTokenExpired(token)) {
-      router.replace("/login");
+      setError("Your session is missing or expired. Please log in again.");
       return;
     }
 
     const payload = getTokenPayload(token);
-    const resolvedCompanyId = Number(payload?.companyid);
+    const resolvedUserId = Number(payload?.userid || 0);
+    const resolvedCompanyId = Number(payload?.companyid || 0);
     const resolvedRole = String(payload?.role || "").toLowerCase();
-    const resolvedCompanyName = String(payload?.companyname || "").trim();
-    if (!Number.isFinite(resolvedCompanyId) || resolvedCompanyId <= 0) {
-      setError("Unable to determine your company ID from the current session");
+    if (!Number.isFinite(resolvedUserId) || resolvedUserId <= 0) {
+      setError("Session token is missing a valid user ID. Please log in again.");
       return;
     }
 
-    setCompanyId(resolvedCompanyId);
-    setCompanyLabel(resolvedCompanyName);
+    if (!Number.isFinite(resolvedCompanyId) || resolvedCompanyId <= 0) {
+      setError("Session token is missing a valid company ID. Please log in again.");
+      return;
+    }
+
+    const ownerRole = resolvedRole === "owner";
+    setIsOwner(ownerRole);
+    setResolvedCompanyId(resolvedCompanyId);
     setCompanyid(String(resolvedCompanyId));
+    setFetchState("loading");
+    void loadCompanies(ownerRole, resolvedCompanyId, resolvedUserId, payload);
     void loadInvites();
-  }, [mounted, router]);
+  }, [mounted]);
+
+  async function loadCompanies(
+    ownerRole: boolean,
+    fallbackCompanyId: number,
+    userId: number,
+    payload: Record<string, unknown> | null,
+  ) {
+    try {
+      if (ownerRole) {
+        const data = await getCompanies();
+        if (data.error) {
+          setError(data.error);
+          return;
+        }
+
+        const options = Array.isArray(data) ? data : [];
+        setCompanyOptions(
+          options
+            .map((company: any) => ({
+              companyid: Number(company?.companyid),
+              companyname: String(company?.companyname || "").trim(),
+            }))
+            .filter((company) => Number.isFinite(company.companyid) && company.companyid > 0 && company.companyname)
+        );
+
+        const selectedCompany = options.find((company: any) => Number(company?.companyid) === fallbackCompanyId);
+
+        return;
+      }
+
+      const response = await authenticatedFetch(`/api/companies?current=1&userid=${encodeURIComponent(String(userId))}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.error || "Failed to load current company");
+        return;
+      }
+
+      const companyName = String(data?.companyname || payload?.companyname || payload?.company || "").trim();
+      setCompanyOptions([{ companyid: Number(data?.companyid || fallbackCompanyId), companyname: companyName }]);
+      setCompanyid(String(Number(data?.companyid || fallbackCompanyId) || fallbackCompanyId));
+    } catch {
+      setError("Failed to load current company");
+    }
+  }
 
   async function loadInvites() {
     const data = (await getCompanyInvites()) as CompanyInviteResponse;
     if (data.error) {
       setError(data.error);
+      setFetchState("error");
       return;
     }
     setInvites(data.invites || []);
+    setFetchState("loaded");
   }
 
   async function handleSendInvite() {
@@ -140,7 +225,9 @@ export default function InvitePage() {
                 <Select
                   labelId="company-select-label"
                   label="Company"
-                  notched
+                  value={companyid}
+                  disabled={!isOwner}
+                  onChange={(e) => setCompanyid(String(e.target.value))}
                   sx={{
                     "& .MuiSelect-select": {
                       py: 1.7,
@@ -149,26 +236,17 @@ export default function InvitePage() {
                       alignItems: "center",
                     },
                   }}
-                  value={companyid}
-                  displayEmpty
-                  onChange={(e) => {
-                    const nextCompanyId = String(e.target.value);
-                    setCompanyid(nextCompanyId);
-                  }}
                   renderValue={(selected) => {
-                    if (!selected) {
-                      return <span style={{ color: "rgba(0, 0, 0, 0.6)", display: "block", lineHeight: 1.5 }}>Select a company</span>;
-                    }
-
-                    if (companyLabel) return <span style={{ display: "block", lineHeight: 1.5 }}>{companyLabel}</span>;
-
-                    return <span style={{ color: "rgba(0, 0, 0, 0.6)", display: "block", lineHeight: 1.5 }}>Select a company</span>;
+                    const selectedId = Number(selected);
+                    const selectedCompany = companyOptions.find((company) => company.companyid === selectedId);
+                    return <span style={{ display: "block", lineHeight: 1.5 }}>{selectedCompany?.companyname || "Loading company..."}</span>;
                   }}
                 >
-                  <MenuItem value="">
-                    Select a company
-                  </MenuItem>
-                  <MenuItem value={String(companyId || "")}>{companyLabel || "Current company"}</MenuItem>
+                  {companyOptions.map((company) => (
+                    <MenuItem key={company.companyid} value={String(company.companyid)}>
+                      {company.companyname}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
               <TextField
@@ -200,50 +278,60 @@ export default function InvitePage() {
         </Card>
       </Box>
 
-      <Card>
+      <Card sx={{ mt: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Recent Invites
+            Invites
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Latest invites for your company.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Loaded invites: {invites.length}
           </Typography>
 
-          {invites.length === 0 ? (
-            <Typography color="text.secondary">No invites yet.</Typography>
-          ) : (
-            <Stack divider={<Divider flexItem />}>
-              {invites.map((invite) => {
-                const statusValue = String(invite.status || "").toLowerCase();
-                const chipColor = statusValue === "accepted"
-                  ? "success"
-                  : statusValue === "pending"
-                    ? "warning"
-                    : "default";
+          <TableContainer sx={{ borderRadius: 2, border: 1, borderColor: "divider" }}>
+            <Table size="small" aria-label="recent invites table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Invited At</TableCell>
+                  <TableCell>Accepted At</TableCell>
+                  <TableCell>Role Name</TableCell>
+                  <TableCell>Invited By</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {invites.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} sx={{ color: "text.secondary" }}>
+                      No invite rows loaded for this company.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  invites.map((invite) => {
+                    const statusValue = String(invite.status || "").toLowerCase();
+                    const chipColor = statusValue === "accepted"
+                      ? "success"
+                      : statusValue === "pending"
+                        ? "warning"
+                        : "default";
 
-                return (
-                  <Box key={invite.inviteid} sx={{ py: 1.5 }}>
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 1 }}
-                    >
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                        {invite.email}
-                      </Typography>
-                      <Chip size="small" label={invite.status} color={chipColor} variant="outlined" />
-                    </Stack>
-
-                    <Typography variant="body2" color="text.secondary">
-                      Company: {invite.companyname || `Company ${invite.companyid}`} | Role: {resolveRoleName(invite.roleid)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
-                      Invite Token: {invite.token}
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
+                    return (
+                      <TableRow key={invite.inviteid} hover>
+                        <TableCell sx={{ fontWeight: 600 }}>{invite.email}</TableCell>
+                        <TableCell>
+                          <Chip size="small" label={invite.status || "Unknown"} color={chipColor} variant="outlined" />
+                        </TableCell>
+                        <TableCell>{formatInviteDate(invite.invitedat)}</TableCell>
+                        <TableCell>{formatInviteDate(invite.acceptedat)}</TableCell>
+                        <TableCell>{invite.rolename || resolveRoleName(invite.roleid)}</TableCell>
+                        <TableCell>{resolveInvitedBy(invite)}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </CardContent>
       </Card>
 

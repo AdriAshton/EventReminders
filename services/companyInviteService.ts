@@ -7,6 +7,10 @@ export type CompanyInviteRecord = {
   companyname?: string;
   companyid?: number;
   roleid?: number;
+  rolename?: string;
+  invitedat?: string;
+  acceptedat?: string | null;
+  invitedbyname?: string;
   token?: string;
 };
 
@@ -21,6 +25,9 @@ export async function getCompanyInvites() {
   const data = await res.json();
   if (!res.ok) {
     return { error: data.error || "Failed to fetch invites" };
+  }
+  if (Array.isArray(data)) {
+    return { invites: data };
   }
   return data;
 }

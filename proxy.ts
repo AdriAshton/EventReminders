@@ -53,6 +53,15 @@ export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (protectedPagePrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    if (pathname.startsWith("/users/invites")) {
+      const payload = getTokenPayload(req);
+      if (!payload) {
+        return NextResponse.redirect(new URL("/login?reason=expired", req.url));
+      }
+
+      return NextResponse.next();
+    }
+
     const payload = getTokenPayload(req);
     if (!payload) {
       return NextResponse.redirect(new URL("/login?reason=expired", req.url));
